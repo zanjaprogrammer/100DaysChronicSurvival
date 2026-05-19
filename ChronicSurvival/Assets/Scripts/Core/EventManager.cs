@@ -214,12 +214,15 @@ namespace ChronicSurvival.Core
         // Round/Day
         public const string DAY_STARTED = "OnDayStarted";
         public const string DAY_ENDED = "OnDayEnded";
+        public const string DAY_CHANGED = "OnDayChanged";
         public const string BATTLE_STARTED = "OnBattleStarted";
         public const string BATTLE_ENDED = "OnBattleEnded";
+        public const string BATTLE_PHASE_CHANGED = "OnBattlePhaseChanged";
 
         // Card Selection
         public const string CARD_SELECTED = "OnCardSelected";
         public const string CARD_APPLIED = "OnCardApplied";
+        public const string CARD_POOL_GENERATED = "OnCardPoolGenerated";
 
         // Random Event
         public const string RANDOM_EVENT_TRIGGERED = "OnRandomEventTriggered";
@@ -228,18 +231,42 @@ namespace ChronicSurvival.Core
         // Body Components
         public const string COMPONENT_CHANGED = "OnComponentChanged";
         public const string COMPONENT_CRITICAL = "OnComponentCritical";
+        public const string BODY_COMPONENT_CHANGED = "OnBodyComponentChanged";
+        public const string BODY_COMPONENT_CRITICAL = "OnBodyComponentCritical";
+        public const string BODY_COMPONENT_RECOVERED = "OnBodyComponentRecovered";
 
         // Disease
         public const string DISEASE_PROGRESSED = "OnDiseaseProgressed";
         public const string DISEASE_STAGE_CHANGED = "OnDiseaseStageChanged";
         public const string DISEASE_CRITICAL = "OnDiseaseCritical";
+        public const string DISEASE_MUTATED = "OnDiseaseMutated";
+        public const string DISEASE_LEVEL_CHANGED = "OnDiseaseLevelChanged";
 
-        // Combat
+        // Combat/Units
         public const string UNIT_SPAWNED = "OnUnitSpawned";
         public const string UNIT_DIED = "OnUnitDied";
+        public const string UNITS_SPAWNED = "OnUnitsSpawned";
+        public const string UNIT_DAMAGED = "OnUnitDamaged";
+        public const string UNIT_HEALED = "OnUnitHealed";
         public const string ENEMY_SPAWNED = "OnEnemySpawned";
         public const string ENEMY_DIED = "OnEnemyDied";
+        public const string ENEMY_WAVE_STARTED = "OnEnemyWaveStarted";
+        public const string ENEMY_WAVE_ENDED = "OnEnemyWaveEnded";
+
+        // Infection Nodes
+        public const string INFECTION_NODE_ACTIVATED = "OnInfectionNodeActivated";
+        public const string INFECTION_NODE_DEACTIVATED = "OnInfectionNodeDeactivated";
+        public const string INFECTION_NODE_DESTROYED = "OnInfectionNodeDestroyed";
         public const string NODE_DESTROYED = "OnNodeDestroyed";
+
+        // UI
+        public const string UI_OPENED = "OnUIOpened";
+        public const string UI_CLOSED = "OnUIClosed";
+        public const string NOTIFICATION_SHOWN = "OnNotificationShown";
+
+        // Audio
+        public const string MUSIC_CHANGED = "OnMusicChanged";
+        public const string SFX_PLAYED = "OnSFXPlayed";
     }
 
     #endregion

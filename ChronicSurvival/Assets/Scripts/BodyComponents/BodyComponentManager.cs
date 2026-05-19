@@ -228,6 +228,21 @@ namespace ChronicSurvival.BodyComponents
             return null;
         }
 
+        public float GetComponentValue(string name)
+        {
+            BodyComponent component = GetComponent(name);
+            return component != null ? component.CurrentValue : 50f; // Default to 50 if not found
+        }
+
+        public void ModifyComponent(string name, float amount)
+        {
+            BodyComponent component = GetComponent(name);
+            if (component != null)
+            {
+                component.ModifyValue(amount);
+            }
+        }
+
         public Dictionary<string, BodyComponent> GetAllComponents()
         {
             return new Dictionary<string, BodyComponent>(components);

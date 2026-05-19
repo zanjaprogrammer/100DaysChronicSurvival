@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ded06333b4b2d4c6a9a2bb0a5db11689, type: 3}
+  m_Name: DiabetesDisease
+  m_EditorClassIdentifier: Assembly-CSharp::ChronicSurvival.Disease.DiabetesDisease
+  diseaseName: 
+  diseaseType: 0
+  description: 
+  progressionRate: 1
+  currentProgression: 0
+  currentStage: 0
+  stage1Threshold: 25
+  stage2Threshold: 50
+  stage3Threshold: 75
+  stage4Threshold: 90
+  damageMultiplier: 1
+  spawnRateMultiplier: 1
+  bloodSugarWeight: 0.4
+  insulinEfficiencyWeight: 0.3
+  metabolismWeight: 0.2
+  inflammationWeight: 0.1
+  criticalBloodSugar: 80
+  criticalInsulinEfficiency: 30
