@@ -15,6 +15,13 @@
 /[Uu]ser[Ss]ettings/
 *.log
 
+# Unity project subfolder
+ChronicSurvival/[Ll]ibrary/
+ChronicSurvival/[Tt]emp/
+ChronicSurvival/[Ll]ogs/
+ChronicSurvival/[Uu]ser[Ss]ettings/
+ChronicSurvival/[Oo]bj/
+
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
 *.blend1.meta
