@@ -1,6 +1,8 @@
 using UnityEngine;
+using System.Collections.Generic;
 using ChronicSurvival.ProceduralVisuals;
 using ChronicSurvival.Core;
+using ChronicSurvival.Arena;
 
 namespace ChronicSurvival.Units
 {
@@ -19,6 +21,12 @@ namespace ChronicSurvival.Units
 
         [Header("Team")]
         [SerializeField] protected UnitTeam team;
+
+        [Header("Pathfinding")]
+        [SerializeField] protected float pathRecalculateInterval = 0.5f;
+        protected List<Vector2> currentPath;
+        protected int currentPathIndex;
+        protected float pathRecalculateTimer;
 
         protected float currentHealth;
         protected Unit currentTarget;
@@ -57,6 +65,12 @@ namespace ChronicSurvival.Units
             attackCooldown = 0f;
         }
 
+        // Idle wander
+        private Vector2 wanderTarget;
+        private float wanderTimer;
+        [SerializeField] protected float wanderInterval = 3f;
+        [SerializeField] protected float wanderRadius = 2f;
+
         protected virtual void Update()
         {
             if (isDead) return;
@@ -69,6 +83,11 @@ namespace ChronicSurvival.Units
             {
                 MoveTowardsTarget();
                 TryAttack();
+            }
+            else
+            {
+                // Wander idle within blood vessels
+                WanderIdle();
             }
         }
 
@@ -109,12 +128,92 @@ namespace ChronicSurvival.Units
             
             if (distance > attackRange)
             {
-                Vector2 direction = ((Vector2)currentTarget.transform.position - (Vector2)transform.position).normalized;
-                rb.linearVelocity = direction * moveSpeed;
+                pathRecalculateTimer -= Time.deltaTime;
+
+                // Request new path periodically or if we don't have one
+                if (currentPath == null || currentPath.Count == 0 || pathRecalculateTimer <= 0f)
+                {
+                    if (BloodstreamPathfinder.Instance != null)
+                    {
+                        currentPath = BloodstreamPathfinder.Instance.FindPath(transform.position, currentTarget.transform.position);
+                        currentPathIndex = 0;
+                    }
+                    else
+                    {
+                        currentPath = new List<Vector2> { currentTarget.transform.position };
+                        currentPathIndex = 0;
+                    }
+                    pathRecalculateTimer = pathRecalculateInterval + Random.Range(-0.05f, 0.05f);
+                }
+
+                // Follow the path
+                if (currentPath != null && currentPathIndex < currentPath.Count)
+                {
+                    Vector2 targetWaypoint = currentPath[currentPathIndex];
+                    
+                    // If we reached the waypoint, advance to next
+                    if (Vector2.Distance(transform.position, targetWaypoint) < 0.4f)
+                    {
+                        currentPathIndex++;
+                        if (currentPathIndex < currentPath.Count)
+                        {
+                            targetWaypoint = currentPath[currentPathIndex];
+                        }
+                    }
+
+                    Vector2 direction = (targetWaypoint - (Vector2)transform.position).normalized;
+                    Vector2 desiredPos = (Vector2)transform.position + direction * moveSpeed * Time.deltaTime;
+
+                    if (ArenaWalkableMask.Instance != null)
+                    {
+                        desiredPos = ArenaWalkableMask.Instance.ConstrainMovement(transform.position, desiredPos);
+                        direction = (desiredPos - (Vector2)transform.position).normalized;
+                    }
+
+                    rb.linearVelocity = direction * moveSpeed;
+                }
+                else
+                {
+                    // Fallback to straight movement
+                    Vector2 direction = ((Vector2)currentTarget.transform.position - (Vector2)transform.position).normalized;
+                    rb.linearVelocity = direction * moveSpeed;
+                }
             }
             else
             {
                 rb.linearVelocity = Vector2.zero;
+                currentPath = null;
+            }
+        }
+
+        protected virtual void WanderIdle()
+        {
+            wanderTimer -= Time.deltaTime;
+
+            if (wanderTimer <= 0f)
+            {
+                // Pick a new random walkable wander target
+                Vector2 randomOffset = Random.insideUnitCircle * wanderRadius;
+                Vector2 candidate = (Vector2)transform.position + randomOffset;
+
+                if (ArenaWalkableMask.Instance != null)
+                {
+                    candidate = ArenaWalkableMask.Instance.GetNearestWalkablePosition(candidate, wanderRadius);
+                }
+
+                wanderTarget = candidate;
+                wanderTimer = wanderInterval + Random.Range(-0.5f, 0.5f);
+            }
+
+            float distToWander = Vector2.Distance(transform.position, wanderTarget);
+            if (distToWander > 0.3f)
+            {
+                Vector2 direction = (wanderTarget - (Vector2)transform.position).normalized;
+                rb.linearVelocity = direction * moveSpeed * 0.4f; // Slower when wandering
+            }
+            else
+            {
+                rb.linearVelocity = Vector2.Lerp(rb.linearVelocity, Vector2.zero, Time.deltaTime * 3f);
             }
         }
 

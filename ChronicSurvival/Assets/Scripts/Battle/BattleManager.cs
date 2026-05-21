@@ -49,6 +49,74 @@ namespace ChronicSurvival.Battle
             Instance = this;
         }
 
+        private void Start()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
+            }
+        }
+
+        private void OnGameStateChanged(GameState newState)
+        {
+            if (newState == GameState.Battle)
+            {
+                StartGameplayBattle();
+            }
+            else if (newState != GameState.Paused && newState != GameState.Initializing)
+            {
+                // Stop spawning and clear units if state moves away from Battle/Pause
+                var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsSortMode.None);
+                foreach (var node in infectionNodes)
+                {
+                    if (node != null)
+                    {
+                        node.DeactivateNode();
+                    }
+                }
+            }
+        }
+
+        private void StartGameplayBattle()
+        {
+            if (debugMode) Debug.Log("[BattleManager] Transitioned to Battle state. Auto-spawning cells and nodes...");
+
+            // Clear any lingering units
+            ClearAllUnits();
+
+            // Spawn immune units
+            UnitSpawner spawner = FindAnyObjectByType<UnitSpawner>();
+            if (spawner != null)
+            {
+                spawner.SpawnAllUnits();
+            }
+            else
+            {
+                Debug.LogWarning("[BattleManager] UnitSpawner not found in scene!");
+            }
+
+            // Activate infection nodes
+            var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsSortMode.None);
+            foreach (var node in infectionNodes)
+            {
+                if (node != null)
+                {
+                    node.ActivateNode();
+                }
+            }
+
+            // Start the actual battle sequence
+            StartBattle();
+        }
+
         private void Update()
         {
             if (!battleActive) return;

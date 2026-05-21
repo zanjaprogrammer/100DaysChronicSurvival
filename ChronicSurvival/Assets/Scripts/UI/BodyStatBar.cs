@@ -81,7 +81,7 @@ namespace ChronicSurvival.UI
 
             switch (state)
             {
-                case ComponentState.Excellent:
+                case ComponentState.Optimal:
                     targetColor = excellentColor;
                     break;
                 case ComponentState.Normal:

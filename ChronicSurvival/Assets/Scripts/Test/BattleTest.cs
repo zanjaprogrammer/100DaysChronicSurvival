@@ -28,13 +28,13 @@ namespace ChronicSurvival.Test
         private void Start()
         {
             if (battleManager == null)
-                battleManager = FindObjectOfType<BattleManager>();
+                battleManager = FindAnyObjectByType<BattleManager>();
 
             if (unitSpawner == null)
-                unitSpawner = FindObjectOfType<UnitSpawner>();
+                unitSpawner = FindAnyObjectByType<UnitSpawner>();
 
             if (infectionNodes == null || infectionNodes.Length == 0)
-                infectionNodes = FindObjectsOfType<InfectionNode>();
+                infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsSortMode.None);
 
             Debug.Log("[BattleTest] Battle Test initialized");
             Debug.Log($"[BattleTest] Controls:");

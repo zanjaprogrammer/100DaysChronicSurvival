@@ -147,10 +147,18 @@ namespace ChronicSurvival.Core
             // Reset all systems
             currentDay = 1;
 
-            // Load game scene if not already loaded
-            if (SceneManager.GetActiveScene().name != "GameScene")
+            // Reset Managers in the scene
+            if (BodyComponents.BodyComponentManager.Instance != null)
             {
-                SceneManager.LoadScene("GameScene");
+                BodyComponents.BodyComponentManager.Instance.ResetComponents();
+            }
+            if (Disease.DiseaseManager.Instance != null)
+            {
+                Disease.DiseaseManager.Instance.ResetAllDiseases();
+            }
+            if (Battle.BattleManager.Instance != null)
+            {
+                Battle.BattleManager.Instance.ClearAllUnits();
             }
 
             // Start first battle
@@ -197,8 +205,11 @@ namespace ChronicSurvival.Core
         public void EndRandomEvent()
         {
             // Check if any disease reached critical level
-            // This will be implemented when we have disease system
-            bool diseasesCritical = false; // TODO: Check disease meters
+            bool diseasesCritical = false;
+            if (Disease.DiseaseManager.Instance != null)
+            {
+                diseasesCritical = Disease.DiseaseManager.Instance.IsAnyDiseaseCritical();
+            }
 
             if (diseasesCritical)
             {
@@ -268,7 +279,12 @@ namespace ChronicSurvival.Core
         {
             Time.timeScale = 1f;
             ChangeState(GameState.MainMenu);
-            SceneManager.LoadScene("MainMenu");
+            
+            // Clean up any remaining units on exit
+            if (Battle.BattleManager.Instance != null)
+            {
+                Battle.BattleManager.Instance.ClearAllUnits();
+            }
         }
 
         public void QuitGame()

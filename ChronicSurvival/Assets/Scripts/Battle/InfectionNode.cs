@@ -110,7 +110,12 @@ namespace ChronicSurvival.Battle
         private Vector2 GetRandomSpawnPosition()
         {
             Vector2 randomOffset = Random.insideUnitCircle * spawnRadius;
-            return (Vector2)transform.position + randomOffset;
+            Vector2 candidate = (Vector2)transform.position + randomOffset;
+            if (Arena.ArenaWalkableMask.Instance != null)
+            {
+                candidate = Arena.ArenaWalkableMask.Instance.GetNearestWalkablePosition(candidate, spawnRadius + 2f);
+            }
+            return candidate;
         }
 
         public void SetDiseaseType(DiseaseType type)

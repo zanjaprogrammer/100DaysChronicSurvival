@@ -102,7 +102,12 @@ namespace ChronicSurvival.Battle
                 );
 
                 Vector2 randomOffset = Random.insideUnitCircle * 0.2f;
-                positions.Add(pos + randomOffset);
+                Vector2 candidate = pos + randomOffset;
+                if (Arena.ArenaWalkableMask.Instance != null)
+                {
+                    candidate = Arena.ArenaWalkableMask.Instance.GetNearestWalkablePosition(candidate, 5f);
+                }
+                positions.Add(candidate);
             }
 
             return positions;

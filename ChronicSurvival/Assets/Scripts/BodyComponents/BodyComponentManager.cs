@@ -219,7 +219,7 @@ namespace ChronicSurvival.BodyComponents
             }
         }
 
-        public BodyComponent GetComponent(string name)
+        public new BodyComponent GetComponent(string name)
         {
             if (components.TryGetValue(name, out BodyComponent component))
             {
@@ -276,6 +276,18 @@ namespace ChronicSurvival.BodyComponents
             }
 
             return count > 0 ? total / count : 0f;
+        }
+
+        public void ResetComponents()
+        {
+            foreach (var component in components.Values)
+            {
+                if (component != null)
+                {
+                    component.Initialize();
+                }
+            }
+            if (debugMode) Debug.Log("[BodyComponentManager] Reset all body components");
         }
     }
 }

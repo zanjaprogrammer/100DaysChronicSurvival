@@ -20,7 +20,7 @@ namespace ChronicSurvival.ProceduralVisuals
         [SerializeField] private float particleSizeVariation = 0.1f;
         [SerializeField] private AnimationCurve sizeOverLifetime = AnimationCurve.Linear(0, 1, 1, 0);
 
-        private ParticleSystem particleSystem;
+        private ParticleSystem trailParticleSystem;
         private Vector3 lastPosition;
         private float emissionTimer;
 
@@ -37,10 +37,10 @@ namespace ChronicSurvival.ProceduralVisuals
             psObj.transform.SetParent(transform);
             psObj.transform.localPosition = Vector3.zero;
 
-            particleSystem = psObj.AddComponent<ParticleSystem>();
+            trailParticleSystem = psObj.AddComponent<ParticleSystem>();
             
             // Main module
-            var main = particleSystem.main;
+            var main = trailParticleSystem.main;
             main.startLifetime = trailLifetime;
             main.startSpeed = 0f;
             main.startSize = particleSize;
@@ -51,22 +51,22 @@ namespace ChronicSurvival.ProceduralVisuals
             main.playOnAwake = false;
 
             // Emission
-            var emission = particleSystem.emission;
+            var emission = trailParticleSystem.emission;
             emission.enabled = false; // We'll emit manually
 
             // Shape
-            var shape = particleSystem.shape;
+            var shape = trailParticleSystem.shape;
             shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Circle;
             shape.radius = 0.1f;
 
             // Size over lifetime
-            var sizeOverLife = particleSystem.sizeOverLifetime;
+            var sizeOverLife = trailParticleSystem.sizeOverLifetime;
             sizeOverLife.enabled = true;
             sizeOverLife.size = new ParticleSystem.MinMaxCurve(1f, sizeOverLifetime);
 
             // Color over lifetime (fade out)
-            var colorOverLife = particleSystem.colorOverLifetime;
+            var colorOverLife = trailParticleSystem.colorOverLifetime;
             colorOverLife.enabled = true;
             Gradient gradient = new Gradient();
             gradient.SetKeys(
@@ -82,7 +82,7 @@ namespace ChronicSurvival.ProceduralVisuals
             colorOverLife.color = new ParticleSystem.MinMaxGradient(gradient);
 
             // Renderer
-            var renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+            var renderer = trailParticleSystem.GetComponent<ParticleSystemRenderer>();
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             renderer.sortingOrder = -2; // Behind blob
         }
@@ -119,7 +119,7 @@ namespace ChronicSurvival.ProceduralVisuals
             emitParams.startColor = trailColor;
             emitParams.startLifetime = trailLifetime;
 
-            particleSystem.Emit(emitParams, 1);
+            trailParticleSystem.Emit(emitParams, 1);
         }
 
         // Public methods
@@ -127,9 +127,9 @@ namespace ChronicSurvival.ProceduralVisuals
         {
             trailColor = color;
             
-            if (particleSystem != null)
+            if (trailParticleSystem != null)
             {
-                var main = particleSystem.main;
+                var main = trailParticleSystem.main;
                 main.startColor = color;
             }
         }

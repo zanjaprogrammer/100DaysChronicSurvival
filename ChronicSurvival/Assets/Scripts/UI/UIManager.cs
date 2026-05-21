@@ -20,8 +20,11 @@ namespace ChronicSurvival.UI
         [SerializeField] private DayCounterUI dayCounter;
         [SerializeField] private BodyStatsPanel bodyStatsPanel;
         [SerializeField] private DiseaseProgressPanel diseaseProgressPanel;
+        [SerializeField] private TopStatusBarUI topStatusBar;
+        [SerializeField] private ActiveEventUI activeEventUI;
 
         private GameObject currentPanel;
+        private GameState previousState = GameState.MainMenu;
 
         private void Awake()
         {
@@ -56,33 +59,46 @@ namespace ChronicSurvival.UI
             switch (newState)
             {
                 case GameState.MainMenu:
+                    HideAllPanels();
                     ShowPanel(mainMenuPanel);
                     break;
 
                 case GameState.Battle:
+                    HideAllPanels();
                     ShowPanel(battleHUDPanel);
                     break;
 
                 case GameState.CardSelection:
-                    ShowPanel(cardSelectionPanel);
+                    // Card selection is shown as OVERLAY on top of battle HUD
+                    // Don't hide battleHUD - show card selection on top
+                    if (battleHUDPanel != null) battleHUDPanel.SetActive(true);
+                    if (cardSelectionPanel != null) cardSelectionPanel.SetActive(true);
+                    currentPanel = cardSelectionPanel;
                     break;
 
                 case GameState.RandomEvent:
+                    HideAllPanels();
                     ShowPanel(randomEventPanel);
                     break;
 
                 case GameState.Paused:
-                    ShowPanel(pausePanel);
+                    // Pause is shown as overlay on top of whatever was showing
+                    if (pausePanel != null) pausePanel.SetActive(true);
+                    currentPanel = pausePanel;
                     break;
 
                 case GameState.GameOver:
+                    HideAllPanels();
                     ShowPanel(gameOverPanel);
                     break;
 
                 case GameState.Victory:
+                    HideAllPanels();
                     ShowPanel(victoryPanel);
                     break;
             }
+
+            previousState = newState;
         }
 
         private void HideAllPanels()
@@ -98,8 +114,6 @@ namespace ChronicSurvival.UI
 
         private void ShowPanel(GameObject panel)
         {
-            HideAllPanels();
-
             if (panel != null)
             {
                 panel.SetActive(true);
@@ -109,22 +123,28 @@ namespace ChronicSurvival.UI
 
         public void ShowBattleHUD()
         {
+            HideAllPanels();
             ShowPanel(battleHUDPanel);
         }
 
         public void ShowCardSelection()
         {
-            ShowPanel(cardSelectionPanel);
+            // Card selection overlays the battle HUD
+            if (battleHUDPanel != null) battleHUDPanel.SetActive(true);
+            if (cardSelectionPanel != null) cardSelectionPanel.SetActive(true);
+            currentPanel = cardSelectionPanel;
         }
 
         public void ShowRandomEvent()
         {
+            HideAllPanels();
             ShowPanel(randomEventPanel);
         }
 
         public void ShowPause()
         {
-            ShowPanel(pausePanel);
+            if (pausePanel != null) pausePanel.SetActive(true);
+            currentPanel = pausePanel;
         }
 
         public void HidePause()
@@ -132,6 +152,28 @@ namespace ChronicSurvival.UI
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.ResumeGame();
+            }
+        }
+
+        /// <summary>
+        /// Show an active event indicator on the battle HUD
+        /// </summary>
+        public void ShowActiveEvent(string eventName, string effectDescription)
+        {
+            if (activeEventUI != null)
+            {
+                activeEventUI.ShowEvent(eventName, effectDescription);
+            }
+        }
+
+        /// <summary>
+        /// Hide the active event indicator
+        /// </summary>
+        public void HideActiveEvent()
+        {
+            if (activeEventUI != null)
+            {
+                activeEventUI.HideEvent();
             }
         }
 
