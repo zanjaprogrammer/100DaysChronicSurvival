@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using ChronicSurvival.Core;
 using ChronicSurvival.Units;
+using ChronicSurvival.Arena;
 
 namespace ChronicSurvival.Battle
 {
@@ -111,9 +112,9 @@ namespace ChronicSurvival.Battle
         {
             Vector2 randomOffset = Random.insideUnitCircle * spawnRadius;
             Vector2 candidate = (Vector2)transform.position + randomOffset;
-            if (Arena.ArenaWalkableMask.Instance != null)
+            if (ArenaWalkableMask.Instance != null)
             {
-                candidate = Arena.ArenaWalkableMask.Instance.GetNearestWalkablePosition(candidate, spawnRadius + 2f);
+                candidate = ArenaWalkableMask.Instance.GetNearestWalkablePosition(candidate, spawnRadius + 8f);
             }
             return candidate;
         }

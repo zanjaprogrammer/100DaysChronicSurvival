@@ -34,6 +34,12 @@ namespace ChronicSurvival.Core
             EnsureInScene<DiseaseManager>(root);
             EnsureInScene<BattleManager>(root);
 
+            Canvas canvas = GameplayUICreator.EnsureCanvas();
+            if (canvas.transform.Find("MainMenuPanel") == null || canvas.transform.Find("BattleHUDPanel") == null)
+            {
+                GameplayUICreator.BuildAll(canvas.transform);
+            }
+
             GameManager.NotifyInstanceReady();
 
             BattleManager bm = Object.FindFirstObjectByType<BattleManager>(FindObjectsInactive.Include);

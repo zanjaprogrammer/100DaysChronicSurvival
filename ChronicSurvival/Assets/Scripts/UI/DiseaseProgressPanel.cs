@@ -62,6 +62,7 @@ namespace ChronicSurvival.UI
                 if (disease == null) continue;
 
                 GameObject barObj = Instantiate(diseaseProgressPrefab, container);
+                barObj.SetActive(true);
                 DiseaseProgressUI progressUI = barObj.GetComponent<DiseaseProgressUI>();
 
                 if (progressUI != null)

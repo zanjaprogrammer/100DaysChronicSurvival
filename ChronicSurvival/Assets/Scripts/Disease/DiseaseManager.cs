@@ -14,7 +14,8 @@ namespace ChronicSurvival.Disease
         [SerializeField] private CancerDisease cancerDisease;
 
         [Header("Settings")]
-        [SerializeField] private bool updateDiseases = true;
+        [SerializeField] private bool updateDiseases = false;
+        [SerializeField] private bool triggerGameOverOnCritical = false;
         [SerializeField] private float updateInterval = 1f;
 
         [Header("Debug")]
@@ -42,31 +43,47 @@ namespace ChronicSurvival.Disease
 
         private void InitializeDiseases()
         {
-            if (diabetesDisease != null)
+            EnsureRuntimeDefaultDiseases();
+            RegisterDisease(Units.DiseaseType.Diabetes, diabetesDisease);
+            RegisterDisease(Units.DiseaseType.Hypertension, hypertensionDisease);
+            RegisterDisease(Units.DiseaseType.Cancer, cancerDisease);
+
+            if (debugMode) Debug.Log($"[DiseaseManager] Initialized {diseases.Count} diseases");
+        }
+
+        private void EnsureRuntimeDefaultDiseases()
+        {
+            if (diabetesDisease == null)
             {
-                diabetesDisease.Initialize();
-                diseases[Units.DiseaseType.Diabetes] = diabetesDisease;
-                diabetesDisease.OnStageChanged += (stage) => OnDiseaseStageChanged(diabetesDisease, stage);
-                diabetesDisease.OnDiseaseCritical += () => OnDiseaseCritical(diabetesDisease);
+                diabetesDisease = CreateRuntimeDisease<DiabetesDisease>("Diabetes", Units.DiseaseType.Diabetes, "Gangguan metabolisme gula darah dan efisiensi insulin.");
             }
 
-            if (hypertensionDisease != null)
+            if (hypertensionDisease == null)
             {
-                hypertensionDisease.Initialize();
-                diseases[Units.DiseaseType.Hypertension] = hypertensionDisease;
-                hypertensionDisease.OnStageChanged += (stage) => OnDiseaseStageChanged(hypertensionDisease, stage);
-                hypertensionDisease.OnDiseaseCritical += () => OnDiseaseCritical(hypertensionDisease);
+                hypertensionDisease = CreateRuntimeDisease<HypertensionDisease>("Hypertension", Units.DiseaseType.Hypertension, "Tekanan darah tinggi yang membebani stabilitas jantung.");
             }
 
-            if (cancerDisease != null)
+            if (cancerDisease == null)
             {
-                cancerDisease.Initialize();
-                diseases[Units.DiseaseType.Cancer] = cancerDisease;
-                cancerDisease.OnStageChanged += (stage) => OnDiseaseStageChanged(cancerDisease, stage);
-                cancerDisease.OnDiseaseCritical += () => OnDiseaseCritical(cancerDisease);
+                cancerDisease = CreateRuntimeDisease<CancerDisease>("Cancer", Units.DiseaseType.Cancer, "Pertumbuhan sel abnormal yang menekan sistem imun tubuh.");
             }
+        }
 
-            if (debugMode) Debug.Log("[DiseaseManager] Initialized all diseases");
+        private T CreateRuntimeDisease<T>(string diseaseName, Units.DiseaseType type, string description) where T : Disease
+        {
+            T disease = ScriptableObject.CreateInstance<T>();
+            disease.ConfigureRuntimeDefaults(diseaseName, type, description);
+            return disease;
+        }
+
+        private void RegisterDisease(Units.DiseaseType type, Disease disease)
+        {
+            if (disease == null) return;
+
+            disease.Initialize();
+            diseases[type] = disease;
+            disease.OnStageChanged += (stage) => OnDiseaseStageChanged(disease, stage);
+            disease.OnDiseaseCritical += () => OnDiseaseCritical(disease);
         }
 
         private void Update()
@@ -156,8 +173,7 @@ namespace ChronicSurvival.Disease
                 Debug.LogWarning($"[DiseaseManager] {disease.DiseaseName} is CRITICAL!");
             }
 
-            // Trigger game over if any disease is critical
-            if (GameManager.Instance != null)
+            if (triggerGameOverOnCritical && GameManager.Instance != null)
             {
                 GameManager.Instance.ChangeState(GameState.GameOver);
             }

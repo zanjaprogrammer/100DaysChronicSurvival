@@ -44,25 +44,30 @@ namespace ChronicSurvival.UI
                 && battle != null
                 && battle.Find("RoundPanel") != null;
 
-            if (hasV2Hud)
+            if (!hasV2Hud)
             {
-                return;
+                BuildAll(canvas.transform);
+                Debug.Log("[GameplayUICreator] AutoBuild: UI v2 selesai dibangun.");
             }
-
-            BuildAll(canvas.transform);
-            Debug.Log("[GameplayUICreator] AutoBuild: UI v2 selesai dibangun.");
 
             if (canvas.GetComponent<GameplayUIInstaller>() == null)
             {
                 canvas.gameObject.AddComponent<GameplayUIInstaller>();
             }
 
+            canvas.gameObject.SetActive(true);
             UIManager ui = canvas.GetComponent<UIManager>();
-            if (ui != null)
-            {
-                ui.ConnectToGameManager();
-                ui.RefreshForCurrentState();
-            }
+            if (ui == null) ui = canvas.gameObject.AddComponent<UIManager>();
+            ui.BindPanels(
+                FindPanel(canvas.transform, "MainMenuPanel"),
+                FindPanel(canvas.transform, "BattleHUDPanel"),
+                FindPanel(canvas.transform, "CardSelectionPanel"),
+                FindPanel(canvas.transform, "RandomEventPanel"),
+                FindPanel(canvas.transform, "GameOverPanel"),
+                FindPanel(canvas.transform, "VictoryPanel"),
+                FindPanel(canvas.transform, "PausePanel"));
+            ui.ConnectToGameManager();
+            ui.RefreshForCurrentState();
         }
 
         public static Canvas EnsureCanvas()

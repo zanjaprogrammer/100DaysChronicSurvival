@@ -148,6 +148,7 @@ namespace ChronicSurvival.UI
             for (int i = 0; i < drawnCards.Count; i++)
             {
                 GameObject cardObj = Instantiate(cardUIPrefab, cardsContainer);
+                cardObj.SetActive(true);
                 CardUI cardUI = cardObj.GetComponent<CardUI>();
                 if (cardUI != null)
                 {

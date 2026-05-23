@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 using System.Collections.Generic;
 using ChronicSurvival.BodyComponents;
 
@@ -41,6 +42,17 @@ namespace ChronicSurvival.UI
                     layoutGroup.spacing = 14f;
                     layoutGroup.padding = new RectOffset(6, 6, 6, 6);
                 }
+            }
+            StartCoroutine(InitializeStatBarsWhenReady());
+        }
+
+        private IEnumerator InitializeStatBarsWhenReady()
+        {
+            int attempts = 0;
+            while (BodyComponentManager.Instance == null && attempts < 30)
+            {
+                attempts++;
+                yield return null;
             }
             InitializeStatBars();
         }
@@ -88,6 +100,7 @@ namespace ChronicSurvival.UI
             }
 
             GameObject barObj = Instantiate(statBarPrefab, statsContainer);
+            barObj.SetActive(true);
             BodyStatBar statBar = barObj.GetComponent<BodyStatBar>();
 
             if (statBar != null)

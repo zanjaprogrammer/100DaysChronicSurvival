@@ -44,6 +44,13 @@ namespace ChronicSurvival.Disease
         public float DamageMultiplier => damageMultiplier;
         public float SpawnRateMultiplier => spawnRateMultiplier;
 
+        public void ConfigureRuntimeDefaults(string name, Units.DiseaseType type, string diseaseDescription)
+        {
+            diseaseName = name;
+            diseaseType = type;
+            description = diseaseDescription;
+        }
+
         public virtual void Initialize()
         {
             currentProgression = 0f;

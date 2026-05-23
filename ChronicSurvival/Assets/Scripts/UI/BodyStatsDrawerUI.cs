@@ -55,7 +55,7 @@ namespace ChronicSurvival.UI
                 }
             }
 
-            BuildCompactChips();
+            StartCoroutine(BuildCompactChipsWhenReady());
 
             if (expandButton != null)
             {
@@ -63,6 +63,17 @@ namespace ChronicSurvival.UI
             }
 
             UpdateArrowVisual();
+        }
+
+        private IEnumerator BuildCompactChipsWhenReady()
+        {
+            int attempts = 0;
+            while ((BodyComponentManager.Instance == null || compactChipsContainer == null) && attempts < 30)
+            {
+                attempts++;
+                yield return null;
+            }
+            BuildCompactChips();
         }
 
         private void BuildCompactChips()
@@ -87,6 +98,7 @@ namespace ChronicSurvival.UI
                 if (compactChipPrefab != null)
                 {
                     chipObj = Instantiate(compactChipPrefab, compactChipsContainer);
+                    chipObj.SetActive(true);
                 }
                 else
                 {

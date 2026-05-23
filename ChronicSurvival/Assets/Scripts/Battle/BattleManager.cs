@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using ChronicSurvival.Core;
 using ChronicSurvival.Cards;
 using ChronicSurvival.Units;
+using ChronicSurvival.ProceduralVisuals;
 
 namespace ChronicSurvival.Battle
 {
@@ -22,6 +23,10 @@ namespace ChronicSurvival.Battle
         [Header("Prefabs")]
         [SerializeField] private GameObject immuneCellPrefab;
         [SerializeField] private GameObject enemyPrefab;
+
+        [Header("Temporary Flow Simulation")]
+        [SerializeField] private bool spawnGameplayUnits = false;
+        [SerializeField] private bool allowBattleGameOver = false;
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = true;
@@ -116,17 +121,14 @@ namespace ChronicSurvival.Battle
 
         private void StartGameplayBattle()
         {
-            if (debugMode) Debug.Log("[BattleManager] Transitioned to Battle state. Auto-spawning cells and nodes...");
+            if (debugMode) Debug.Log("[BattleManager] Transitioned to Battle state.");
 
-            // Clear any lingering units
             ClearAllUnits();
 
-            if (immuneCellPrefab == null)
+            if (spawnGameplayUnits)
             {
-                Debug.LogWarning("[BattleManager] immuneCellPrefab belum di-assign! Sel imun tidak di-spawn, tapi battle tetap jalan.");
-            }
-            else
-            {
+                EnsureRuntimeDefaults();
+
                 UnitSpawner spawner = FindFirstObjectByType<UnitSpawner>(FindObjectsInactive.Include);
                 if (spawner != null)
                 {
@@ -136,20 +138,91 @@ namespace ChronicSurvival.Battle
                 {
                     Debug.LogWarning("[BattleManager] UnitSpawner not found in scene!");
                 }
-            }
 
-            // Activate infection nodes
-            var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var node in infectionNodes)
-            {
-                if (node != null)
+                var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (var node in infectionNodes)
                 {
-                    node.ActivateNode();
+                    if (node != null)
+                    {
+                        node.ActivateNode();
+                    }
                 }
             }
 
-            // Start the actual battle sequence
             StartBattle();
+        }
+
+        private void EnsureRuntimeDefaults()
+        {
+            if (immuneCellPrefab == null) immuneCellPrefab = CreateRuntimeUnitPrefab("RuntimeImmuneCellPrefab", true);
+            if (enemyPrefab == null) enemyPrefab = CreateRuntimeUnitPrefab("RuntimeEnemyPrefab", false);
+
+            if (FindFirstObjectByType<UnitSpawner>(FindObjectsInactive.Include) == null)
+            {
+                GameObject spawnerObj = new GameObject("UnitSpawner");
+                spawnerObj.transform.position = Vector3.zero;
+                spawnerObj.AddComponent<UnitSpawner>();
+            }
+
+            if (FindFirstObjectByType<InfectionNode>(FindObjectsInactive.Include) == null)
+            {
+                CreateRuntimeNode("DiabetesNode", DiseaseType.Diabetes, new Vector2(9f, 1.8f));
+                CreateRuntimeNode("HypertensionNode", DiseaseType.Hypertension, new Vector2(-8f, 3.4f));
+                CreateRuntimeNode("CancerNode", DiseaseType.Cancer, new Vector2(7f, -3.8f));
+            }
+        }
+
+        private GameObject CreateRuntimeUnitPrefab(string name, bool immune)
+        {
+            GameObject prefab = new GameObject(name);
+            prefab.SetActive(false);
+            prefab.AddComponent<BlobGenerator>();
+            prefab.AddComponent<SlimeBlobPhysics>();
+            CircleCollider2D collider = prefab.AddComponent<CircleCollider2D>();
+            collider.radius = immune ? 0.42f : 0.34f;
+            Rigidbody2D body = prefab.AddComponent<Rigidbody2D>();
+            body.gravityScale = 0f;
+            body.linearDamping = 2f;
+
+            if (immune) prefab.AddComponent<ImmuneCell>();
+            else prefab.AddComponent<Enemy>();
+
+            DontDestroyOnLoad(prefab);
+            return prefab;
+        }
+
+        private void CreateRuntimeNode(string name, DiseaseType disease, Vector2 position)
+        {
+            GameObject node = new GameObject(name);
+            node.transform.position = position;
+            InfectionNode infection = node.AddComponent<InfectionNode>();
+            infection.SetDiseaseType(disease);
+
+            SpriteRenderer renderer = node.AddComponent<SpriteRenderer>();
+            renderer.sprite = CreateRuntimeCircleSprite(32, new Color(1f, 0.08f, 0.08f, 0.65f));
+            renderer.sortingOrder = -20;
+        }
+
+        private Sprite CreateRuntimeCircleSprite(int size, Color color)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            Color[] pixels = new Color[size * size];
+            Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+            float radius = size * 0.45f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x, y), center);
+                    float a = 1f - Mathf.SmoothStep(radius * 0.45f, radius, d);
+                    pixels[y * size + x] = new Color(color.r, color.g, color.b, color.a * a);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         }
 
         private void Update()
@@ -167,7 +240,10 @@ namespace ChronicSurvival.Battle
             }
 
             CleanupDeadUnits();
-            CheckBattleEnd();
+            if (allowBattleGameOver)
+            {
+                CheckBattleEnd();
+            }
         }
 
         public void StartBattle()
@@ -220,6 +296,7 @@ namespace ChronicSurvival.Battle
             Vector2 spawnPos = position ?? GetRandomSpawnPosition(immuneSpawnArea);
             
             GameObject obj = Instantiate(immuneCellPrefab, spawnPos, Quaternion.identity);
+            obj.SetActive(true);
             ImmuneCell cell = obj.GetComponent<ImmuneCell>();
             
             if (cell != null)
@@ -242,6 +319,7 @@ namespace ChronicSurvival.Battle
             Vector2 spawnPos = position ?? GetRandomSpawnPosition(enemySpawnArea);
             
             GameObject obj = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
+            obj.SetActive(true);
             Enemy enemy = obj.GetComponent<Enemy>();
             
             if (enemy != null)

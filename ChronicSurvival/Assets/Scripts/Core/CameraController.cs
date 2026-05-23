@@ -5,11 +5,13 @@ namespace ChronicSurvival.Core
     public class CameraController : MonoBehaviour
     {
         [Header("Movement")]
-        [SerializeField] private float moveSpeed = 5f;
+        [SerializeField] private float moveSpeed = 7f;
         [SerializeField] private float edgeScrollSpeed = 10f;
         [SerializeField] private float edgeScrollBorder = 50f;
         [SerializeField] private bool enableEdgeScroll = true;
         [SerializeField] private bool enableKeyboardMove = true;
+        [SerializeField] private bool enableDragPan = true;
+        [SerializeField] private int dragMouseButton = 2;
 
         [Header("Zoom")]
         [SerializeField] private float zoomSpeed = 2f;
@@ -29,6 +31,7 @@ namespace ChronicSurvival.Core
         private Camera cam;
         private Vector3 targetPosition;
         private float targetZoom;
+        private Vector3 lastDragWorld;
 
         private void Start()
         {
@@ -40,6 +43,7 @@ namespace ChronicSurvival.Core
         private void Update()
         {
             HandleMovement();
+            HandleDragPan();
             HandleZoom();
             ApplyMovement();
         }
@@ -79,11 +83,26 @@ namespace ChronicSurvival.Core
                 moveDirection.Normalize();
                 targetPosition += moveDirection * moveSpeed * Time.deltaTime;
 
-                if (useBounds)
-                {
-                    targetPosition.x = Mathf.Clamp(targetPosition.x, minBounds.x, maxBounds.x);
-                    targetPosition.y = Mathf.Clamp(targetPosition.y, minBounds.y, maxBounds.y);
-                }
+                ClampTargetPosition();
+            }
+        }
+
+        private void HandleDragPan()
+        {
+            if (!enableDragPan || cam == null) return;
+
+            if (Input.GetMouseButtonDown(dragMouseButton))
+            {
+                lastDragWorld = cam.ScreenToWorldPoint(Input.mousePosition);
+            }
+
+            if (Input.GetMouseButton(dragMouseButton))
+            {
+                Vector3 currentDragWorld = cam.ScreenToWorldPoint(Input.mousePosition);
+                Vector3 delta = lastDragWorld - currentDragWorld;
+                delta.z = 0f;
+                targetPosition += delta;
+                ClampTargetPosition();
             }
         }
 
@@ -117,15 +136,48 @@ namespace ChronicSurvival.Core
             transform.position = pos;
         }
 
+        private void ClampTargetPosition()
+        {
+            if (!useBounds) return;
+
+            float halfHeight = targetZoom;
+            float halfWidth = targetZoom * (cam != null ? cam.aspect : 16f / 9f);
+            float minX = minBounds.x + halfWidth;
+            float maxX = maxBounds.x - halfWidth;
+            float minY = minBounds.y + halfHeight;
+            float maxY = maxBounds.y - halfHeight;
+
+            targetPosition.x = minX <= maxX ? Mathf.Clamp(targetPosition.x, minX, maxX) : (minBounds.x + maxBounds.x) * 0.5f;
+            targetPosition.y = minY <= maxY ? Mathf.Clamp(targetPosition.y, minY, maxY) : (minBounds.y + maxBounds.y) * 0.5f;
+        }
+
         public void SetPosition(Vector3 position)
         {
             targetPosition = position;
             targetPosition.z = -10f;
+            ClampTargetPosition();
         }
 
         public void SetZoom(float zoom)
         {
             targetZoom = Mathf.Clamp(zoom, minZoom, maxZoom);
+            ClampTargetPosition();
+        }
+
+        public void SetZoomLimits(float min, float max)
+        {
+            minZoom = min;
+            maxZoom = Mathf.Max(minZoom, max);
+            targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
+            ClampTargetPosition();
+        }
+
+        public void SetBounds(Bounds bounds, float padding = 0f)
+        {
+            useBounds = true;
+            minBounds = new Vector2(bounds.min.x + padding, bounds.min.y + padding);
+            maxBounds = new Vector2(bounds.max.x - padding, bounds.max.y - padding);
+            ClampTargetPosition();
         }
     }
 }

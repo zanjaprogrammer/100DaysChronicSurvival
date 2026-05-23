@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using ChronicSurvival.Core;
 using ChronicSurvival.Units;
+using ChronicSurvival.Arena;
 
 namespace ChronicSurvival.Battle
 {
@@ -84,6 +85,10 @@ namespace ChronicSurvival.Battle
         {
             List<Vector2> positions = new List<Vector2>();
             Vector2 center = spawnArea != null ? (Vector2)spawnArea.position : Vector2.zero;
+            if (ArenaWalkableMask.Instance != null)
+            {
+                center = ArenaWalkableMask.Instance.GetNearestWalkablePosition(center, 12f);
+            }
 
             int rows = Mathf.CeilToInt(Mathf.Sqrt(count));
             int cols = Mathf.CeilToInt((float)count / rows);
@@ -103,9 +108,9 @@ namespace ChronicSurvival.Battle
 
                 Vector2 randomOffset = Random.insideUnitCircle * 0.2f;
                 Vector2 candidate = pos + randomOffset;
-                if (Arena.ArenaWalkableMask.Instance != null)
+                if (ArenaWalkableMask.Instance != null)
                 {
-                    candidate = Arena.ArenaWalkableMask.Instance.GetNearestWalkablePosition(candidate, 5f);
+                    candidate = ArenaWalkableMask.Instance.GetNearestWalkablePosition(candidate, 8f);
                 }
                 positions.Add(candidate);
             }

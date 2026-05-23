@@ -84,6 +84,43 @@ namespace ChronicSurvival.Cards
                     allCards.AddRange(fromResources);
                 }
             }
+
+            if (allCards.Count == 0)
+            {
+                AddRuntimeDefaultCards();
+            }
+        }
+
+        private void AddRuntimeDefaultCards()
+        {
+            allCards.Add(CreateRuntimeCard("Istirahat Taktis", "Pulihkan energi dan kualitas tidur tubuh.", CardType.Lifestyle, CardRarity.Common,
+                new CardEffect { componentName = "Energy", value = 12f },
+                new CardEffect { componentName = "SleepQuality", value = 10f }));
+            allCards.Add(CreateRuntimeCard("Hidrasi Klinis", "Stabilkan cairan tubuh dan bantu mengurangi toksin.", CardType.Medical, CardRarity.Common,
+                new CardEffect { componentName = "Hydration", value = 18f },
+                new CardEffect { componentName = "Toxicity", value = -8f }));
+            allCards.Add(CreateRuntimeCard("Nutrisi Rendah Gula", "Tekan lonjakan gula darah dan bantu insulin bekerja.", CardType.Lifestyle, CardRarity.Uncommon,
+                new CardEffect { componentName = "BloodSugar", value = -18f },
+                new CardEffect { componentName = "InsulinEfficiency", value = 10f }));
+            allCards.Add(CreateRuntimeCard("Latihan Pernapasan", "Turunkan stress dan tekanan darah.", CardType.Lifestyle, CardRarity.Common,
+                new CardEffect { componentName = "Stress", value = -15f },
+                new CardEffect { componentName = "BloodPressure", value = -8f }));
+            allCards.Add(CreateRuntimeCard("Terapi Anti Inflamasi", "Redakan peradangan dan bantu sistem imun.", CardType.Medical, CardRarity.Rare,
+                new CardEffect { componentName = "Inflammation", value = -16f },
+                new CardEffect { componentName = "ImmuneStrength", value = 8f }));
+        }
+
+        private ActionCard CreateRuntimeCard(string cardName, string description, CardType type, CardRarity rarity, params CardEffect[] effects)
+        {
+            ActionCard card = ScriptableObject.CreateInstance<ActionCard>();
+            card.cardName = cardName;
+            card.description = description;
+            card.cardType = type;
+            card.rarity = rarity;
+            card.unlockAtDay = 1;
+            card.isUnlocked = true;
+            card.effects = new List<CardEffect>(effects);
+            return card;
         }
 
         public void SetCardDatabase(ActionCardDatabase database)

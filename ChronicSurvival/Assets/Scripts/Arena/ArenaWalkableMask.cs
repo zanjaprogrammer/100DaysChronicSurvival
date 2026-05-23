@@ -54,7 +54,7 @@ namespace ChronicSurvival.Arena
         {
             if (walkableMask == null)
             {
-                Debug.LogError("[ArenaWalkableMask] No walkable mask texture assigned!");
+                isInitialized = false;
                 return;
             }
 
@@ -76,9 +76,15 @@ namespace ChronicSurvival.Arena
             }
         }
 
-        /// <summary>
-        /// Check if a world-space position is within a walkable area (blood vessel).
-        /// </summary>
+        public void SetRuntimeMask(Texture2D mask, Vector2 boundsMin, Vector2 boundsMax, float threshold = 0.3f)
+        {
+            walkableMask = mask;
+            arenaBoundsMin = boundsMin;
+            arenaBoundsMax = boundsMax;
+            walkableThreshold = threshold;
+            Initialize();
+        }
+
         public bool IsWalkable(Vector2 worldPosition)
         {
             if (!isInitialized) return true; // Fallback: allow all if not initialized
