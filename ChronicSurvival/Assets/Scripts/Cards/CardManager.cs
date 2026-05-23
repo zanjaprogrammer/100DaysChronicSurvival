@@ -11,6 +11,9 @@ namespace ChronicSurvival.Cards
 
         [Header("Card Pool")]
         [SerializeField] private List<ActionCard> allCards = new List<ActionCard>();
+        [SerializeField] private ActionCardDatabase cardDatabase;
+        [SerializeField] private bool autoLoadFromDatabase = true;
+        [SerializeField] private bool autoLoadFromResources = true;
 
         [Header("Settings")]
         [SerializeField] private int cardsPerDraw = 3;
@@ -50,6 +53,7 @@ namespace ChronicSurvival.Cards
 
         private void InitializeCardPool()
         {
+            PopulatePoolIfEmpty();
             UpdateAvailableCards();
 
             if (debugMode)
@@ -58,12 +62,46 @@ namespace ChronicSurvival.Cards
             }
         }
 
+        private void PopulatePoolIfEmpty()
+        {
+            if (allCards != null && allCards.Count > 0)
+            {
+                return;
+            }
+
+            allCards = new List<ActionCard>();
+
+            if (autoLoadFromDatabase && cardDatabase != null && cardDatabase.cards.Count > 0)
+            {
+                allCards.AddRange(cardDatabase.cards);
+            }
+
+            if (autoLoadFromResources && allCards.Count == 0)
+            {
+                var fromResources = Resources.LoadAll<ActionCard>("Cards");
+                if (fromResources != null && fromResources.Length > 0)
+                {
+                    allCards.AddRange(fromResources);
+                }
+            }
+        }
+
+        public void SetCardDatabase(ActionCardDatabase database)
+        {
+            cardDatabase = database;
+            if (database != null)
+            {
+                allCards = new List<ActionCard>(database.cards);
+                UpdateAvailableCards();
+            }
+        }
+
         private void UpdateAvailableCards()
         {
             int currentDay = GameManager.Instance != null ? GameManager.Instance.CurrentDay : 1;
 
             availableCards = allCards
-                .Where(card => card != null && card.isUnlocked && card.unlockAtDay <= currentDay)
+                .Where(card => card != null && card.isUnlocked && card.unlockAtDay <= currentDay && card.cardType != CardType.Debuff)
                 .ToList();
         }
 

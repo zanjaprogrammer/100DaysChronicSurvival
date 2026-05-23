@@ -46,6 +46,9 @@
 - [x] CardManager (draw & select)
 - [x] Card effects pada body components
 - [x] Rarity system (Common, Rare, Legendary)
+- [x] 23+ lifestyle cards (Resources/Cards)
+- [x] Immune combat bonus (CardBuffManager)
+- [x] ActionCardDatabase + auto-load pool
 
 ---
 

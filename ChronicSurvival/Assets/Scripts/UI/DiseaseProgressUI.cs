@@ -22,9 +22,9 @@ namespace ChronicSurvival.UI
 
         [Header("Settings")]
         [SerializeField] private float animationSpeed = 5f;
-        [SerializeField] private Color safeColor = Color.green;
-        [SerializeField] private Color warningColor = Color.yellow;
-        [SerializeField] private Color criticalColor = Color.red;
+        [SerializeField] private Color safeColor = new Color(0.22f, 0.83f, 0.54f, 1f);
+        [SerializeField] private Color warningColor = new Color(0.94f, 0.53f, 0.22f, 1f);
+        [SerializeField] private Color criticalColor = new Color(1f, 0.34f, 0.30f, 1f);
 
         private ChronicSurvival.Disease.Disease diseaseData;
         private float targetFillAmount = 0f;
@@ -42,7 +42,7 @@ namespace ChronicSurvival.UI
 
             if (diseaseNameText != null)
             {
-                diseaseNameText.text = diseaseData.DiseaseName;
+                diseaseNameText.text = GetIndonesianDiseaseName(diseaseData);
             }
 
             // Instantly sync initial value
@@ -72,6 +72,16 @@ namespace ChronicSurvival.UI
             UpdateDisplay(diseaseData.CurrentProgression);
         }
 
+        private static string GetIndonesianDiseaseName(ChronicSurvival.Disease.Disease disease)
+        {
+            if (disease == null) return "—";
+            string n = disease.DiseaseName ?? "";
+            if (n.Contains("Diabetes") || disease.GetType().Name.Contains("Diabetes")) return "DIABETES";
+            if (n.Contains("Hypertension") || n.Contains("Hipertensi") || disease.GetType().Name.Contains("Hypertension")) return "HIPERTENSI";
+            if (n.Contains("Cancer") || n.Contains("Kanker") || disease.GetType().Name.Contains("Cancer")) return "KANKER";
+            return n.ToUpperInvariant();
+        }
+
         private void UpdateDisplay(float progression)
         {
             if (diseaseData == null) return;
@@ -85,7 +95,7 @@ namespace ChronicSurvival.UI
             // Set stage text
             if (stageText != null)
             {
-                stageText.text = diseaseData.GetStageDescription();
+                stageText.text = diseaseData.GetStageDescription().ToUpperInvariant();
             }
 
             // Color shift based on stage/progression
@@ -107,6 +117,10 @@ namespace ChronicSurvival.UI
             if (progressText != null)
             {
                 progressText.color = targetColor;
+            }
+            if (stageText != null)
+            {
+                stageText.color = targetColor;
             }
         }
     }

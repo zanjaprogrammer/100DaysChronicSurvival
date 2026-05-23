@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using ChronicSurvival.Core;
 
 namespace ChronicSurvival.UI
@@ -18,13 +19,14 @@ namespace ChronicSurvival.UI
 
         [Header("HUD Components")]
         [SerializeField] private DayCounterUI dayCounter;
-        [SerializeField] private BodyStatsPanel bodyStatsPanel;
+        [SerializeField] private BodyStatsDrawerUI bodyStatsDrawer;
         [SerializeField] private DiseaseProgressPanel diseaseProgressPanel;
         [SerializeField] private TopStatusBarUI topStatusBar;
         [SerializeField] private ActiveEventUI activeEventUI;
+        [SerializeField] private GameplayHUDController gameplayHUDController;
 
-        private GameObject currentPanel;
         private GameState previousState = GameState.MainMenu;
+        private bool handlingStateChange = false;
 
         private void Awake()
         {
@@ -35,70 +37,162 @@ namespace ChronicSurvival.UI
             }
 
             Instance = this;
-            DontDestroyOnLoad(gameObject);
-
             InitializeUI();
+
+        }
+
+        private void OnEnable()
+        {
+            ConnectToGameManager();
+            GameManager.OnInstanceReady += ConnectToGameManager;
         }
 
         private void Start()
         {
+            ConnectToGameManager();
+            RefreshForCurrentState();
+        }
+
+        public void ConnectToGameManager()
+        {
+            if (GameManager.Instance == null) return;
+
+            GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
+            GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
+            OnGameStateChanged(GameManager.Instance.CurrentState);
+        }
+
+        private void OnDisable()
+        {
+            GameManager.OnInstanceReady -= ConnectToGameManager;
             if (GameManager.Instance != null)
             {
-                GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
+                GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
             }
         }
 
         private void InitializeUI()
         {
             HideAllPanels();
-            ShowPanel(mainMenuPanel);
+            if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
+        }
+
+        /// <summary>
+        /// Called by GameplayUIInstaller after runtime/editor UI build.
+        /// </summary>
+        public void BindPanels(
+            GameObject mainMenu,
+            GameObject battleHud,
+            GameObject cardSelection,
+            GameObject randomEvent,
+            GameObject gameOver,
+            GameObject victory,
+            GameObject pause)
+        {
+            mainMenuPanel = mainMenu;
+            battleHUDPanel = battleHud;
+            cardSelectionPanel = cardSelection;
+            randomEventPanel = randomEvent;
+            gameOverPanel = gameOver;
+            victoryPanel = victory;
+            pausePanel = pause;
+
+            if (battleHud != null)
+            {
+                dayCounter = battleHud.GetComponentInChildren<DayCounterUI>(true);
+                bodyStatsDrawer = battleHud.GetComponentInChildren<BodyStatsDrawerUI>(true);
+                diseaseProgressPanel = battleHud.GetComponentInChildren<DiseaseProgressPanel>(true);
+                topStatusBar = battleHud.GetComponentInChildren<TopStatusBarUI>(true);
+                activeEventUI = battleHud.GetComponentInChildren<ActiveEventUI>(true);
+                gameplayHUDController = battleHud.GetComponent<GameplayHUDController>();
+            }
+        }
+
+        public void RefreshForCurrentState()
+        {
+            if (GameManager.Instance != null)
+            {
+                OnGameStateChanged(GameManager.Instance.CurrentState);
+            }
+            else
+            {
+                InitializeUI();
+            }
         }
 
         private void OnGameStateChanged(GameState newState)
         {
+            if (handlingStateChange) return;
+            handlingStateChange = true;
+
+            try
+            {
+                EnsurePanelsBound();
+
             switch (newState)
             {
-                case GameState.MainMenu:
+                case GameState.Initializing:
                     HideAllPanels();
-                    ShowPanel(mainMenuPanel);
+                    break;
+
+                case GameState.MainMenu:
+                    SetGameplayDimmed(false);
+                    HideAllPanels();
+                    if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
                     break;
 
                 case GameState.Battle:
+                    SetGameplayDimmed(false);
                     HideAllPanels();
-                    ShowPanel(battleHUDPanel);
+                    if (battleHUDPanel != null) battleHUDPanel.SetActive(true);
+                    if (gameplayHUDController != null) gameplayHUDController.SetInteractable(true);
                     break;
 
                 case GameState.CardSelection:
-                    // Card selection is shown as OVERLAY on top of battle HUD
-                    // Don't hide battleHUD - show card selection on top
                     if (battleHUDPanel != null) battleHUDPanel.SetActive(true);
                     if (cardSelectionPanel != null) cardSelectionPanel.SetActive(true);
-                    currentPanel = cardSelectionPanel;
+                    SetGameplayDimmed(true);
+                    if (gameplayHUDController != null) gameplayHUDController.SetInteractable(false);
                     break;
 
                 case GameState.RandomEvent:
+                    SetGameplayDimmed(false);
                     HideAllPanels();
-                    ShowPanel(randomEventPanel);
+                    if (randomEventPanel != null) randomEventPanel.SetActive(true);
                     break;
 
                 case GameState.Paused:
-                    // Pause is shown as overlay on top of whatever was showing
+                    if (battleHUDPanel != null) battleHUDPanel.SetActive(true);
                     if (pausePanel != null) pausePanel.SetActive(true);
-                    currentPanel = pausePanel;
                     break;
 
                 case GameState.GameOver:
+                    SetGameplayDimmed(false);
                     HideAllPanels();
-                    ShowPanel(gameOverPanel);
+                    if (gameOverPanel != null) gameOverPanel.SetActive(true);
                     break;
 
                 case GameState.Victory:
+                    SetGameplayDimmed(false);
                     HideAllPanels();
-                    ShowPanel(victoryPanel);
+                    if (victoryPanel != null) victoryPanel.SetActive(true);
                     break;
             }
 
             previousState = newState;
+            }
+            finally
+            {
+                handlingStateChange = false;
+            }
+        }
+
+        private void SetGameplayDimmed(bool dimmed)
+        {
+            if (gameplayHUDController != null)
+            {
+                gameplayHUDController.SetDimmed(dimmed);
+            }
         }
 
         private void HideAllPanels()
@@ -112,77 +206,66 @@ namespace ChronicSurvival.UI
             if (pausePanel != null) pausePanel.SetActive(false);
         }
 
-        private void ShowPanel(GameObject panel)
+        public void ShowActiveEvent(string eventName, string effectDescription)
         {
-            if (panel != null)
-            {
-                panel.SetActive(true);
-                currentPanel = panel;
-            }
+            activeEventUI?.ShowEvent(eventName, effectDescription);
         }
 
-        public void ShowBattleHUD()
+        public void HideActiveEvent()
         {
-            HideAllPanels();
-            ShowPanel(battleHUDPanel);
-        }
-
-        public void ShowCardSelection()
-        {
-            // Card selection overlays the battle HUD
-            if (battleHUDPanel != null) battleHUDPanel.SetActive(true);
-            if (cardSelectionPanel != null) cardSelectionPanel.SetActive(true);
-            currentPanel = cardSelectionPanel;
-        }
-
-        public void ShowRandomEvent()
-        {
-            HideAllPanels();
-            ShowPanel(randomEventPanel);
-        }
-
-        public void ShowPause()
-        {
-            if (pausePanel != null) pausePanel.SetActive(true);
-            currentPanel = pausePanel;
+            activeEventUI?.HideEvent();
         }
 
         public void HidePause()
         {
+            if (pausePanel != null) pausePanel.SetActive(false);
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.ResumeGame();
             }
         }
 
-        /// <summary>
-        /// Show an active event indicator on the battle HUD
-        /// </summary>
-        public void ShowActiveEvent(string eventName, string effectDescription)
+        private void EnsurePanelsBound()
         {
-            if (activeEventUI != null)
+            Transform root = GetUIRoot();
+            Transform battleHud = root.Find("BattleHUDPanel");
+
+            bool rebuilt = false;
+            if (root.Find("MainMenuPanel") == null || battleHud == null || battleHud.Find("RoundPanel") == null)
             {
-                activeEventUI.ShowEvent(eventName, effectDescription);
+                GameplayUICreator.BuildAll(root);
+                battleHud = root.Find("BattleHUDPanel");
+                rebuilt = true;
             }
+
+            if (!rebuilt && mainMenuPanel != null && battleHUDPanel != null) return;
+
+            BindPanels(
+                FindPanel(root, "MainMenuPanel"),
+                FindPanel(root, "BattleHUDPanel"),
+                FindPanel(root, "CardSelectionPanel"),
+                FindPanel(root, "RandomEventPanel"),
+                FindPanel(root, "GameOverPanel"),
+                FindPanel(root, "VictoryPanel"),
+                FindPanel(root, "PausePanel"));
         }
 
-        /// <summary>
-        /// Hide the active event indicator
-        /// </summary>
-        public void HideActiveEvent()
+        private Transform GetUIRoot()
         {
-            if (activeEventUI != null)
-            {
-                activeEventUI.HideEvent();
-            }
+            Canvas ownCanvas = GetComponent<Canvas>();
+            if (ownCanvas != null) return ownCanvas.transform;
+
+            Canvas parentCanvas = GetComponentInParent<Canvas>(true);
+            if (parentCanvas != null) return parentCanvas.transform;
+
+            return GameplayUICreator.EnsureCanvas().transform;
         }
 
-        private void OnDestroy()
+        private static GameObject FindPanel(Transform root, string name)
         {
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
-            }
+            Transform t = root.Find(name);
+            return t != null ? t.gameObject : null;
         }
     }
 }

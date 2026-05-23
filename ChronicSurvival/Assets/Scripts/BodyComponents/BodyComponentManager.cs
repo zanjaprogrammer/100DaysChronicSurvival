@@ -6,7 +6,28 @@ namespace ChronicSurvival.BodyComponents
 {
     public class BodyComponentManager : MonoBehaviour
     {
-        public static BodyComponentManager Instance { get; private set; }
+        private static BodyComponentManager _instance;
+        public static BodyComponentManager Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = FindObjectOfType<BodyComponentManager>();
+                    if (_instance == null)
+                    {
+                        GameObject go = new GameObject("_BodyComponentManager");
+                        _instance = go.AddComponent<BodyComponentManager>();
+                        DontDestroyOnLoad(go);
+                    }
+                }
+                return _instance;
+            }
+            private set
+            {
+                _instance = value;
+            }
+        }
 
         [Header("Components")]
         [SerializeField] private BodyComponent energy;
@@ -51,21 +72,76 @@ namespace ChronicSurvival.BodyComponents
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (_instance != null && _instance != this)
             {
                 Destroy(gameObject);
                 return;
             }
 
-            Instance = this;
+            _instance = this;
             DontDestroyOnLoad(gameObject);
 
             InitializeComponents();
         }
 
+        private BodyComponent EnsureComponent(
+            string name, 
+            BodyComponent existing, 
+            string description, 
+            float startVal, 
+            float minVal, 
+            float maxVal, 
+            float optMin, 
+            float optMax, 
+            float critLow, 
+            float critHigh, 
+            float decay, 
+            Color normalCol)
+        {
+            if (existing != null)
+            {
+                if (string.IsNullOrEmpty(existing.componentName))
+                    existing.componentName = name;
+                return existing;
+            }
+
+            BodyComponent comp = ScriptableObject.CreateInstance<BodyComponent>();
+            comp.componentName = name;
+            comp.description = description;
+            comp.startingValue = startVal;
+            comp.minValue = minVal;
+            comp.maxValue = maxVal;
+            comp.optimalMin = optMin;
+            comp.optimalMax = optMax;
+            comp.criticalLow = critLow;
+            comp.criticalHigh = critHigh;
+            comp.passiveDecay = decay;
+            comp.decayInterval = 1f;
+            comp.normalColor = normalCol;
+            comp.warningColor = new Color(0.95f, 0.6f, 0.15f); // Orange
+            comp.dangerColor = new Color(0.85f, 0.15f, 0.15f); // Red
+            return comp;
+        }
+
         private void InitializeComponents()
         {
             components = new Dictionary<string, BodyComponent>();
+
+            // Ensure all components exist (fallback to runtime instantiation with defaults if missing)
+            energy = EnsureComponent("Energy", energy, "Stamina tubuh dan energi aktivitas.", 70f, 0f, 100f, 60f, 100f, 20f, 100f, -0.2f, new Color(0.95f, 0.76f, 0.2f));
+            bloodSugar = EnsureComponent("Gula Darah", bloodSugar, "Kadar glukosa dalam aliran darah.", 85f, 0f, 200f, 70f, 110f, 50f, 150f, -0.1f, new Color(0.9f, 0.3f, 0.3f));
+            bloodPressure = EnsureComponent("Tekanan Darah", bloodPressure, "Tekanan darah sistolik.", 120f, 0f, 200f, 90f, 130f, 70f, 160f, -0.05f, new Color(0.85f, 0.2f, 0.4f));
+            immuneStrength = EnsureComponent("Sistem Imun", immuneStrength, "Kekuatan pertahanan tubuh melawan patogen.", 68f, 0f, 100f, 60f, 100f, 20f, 100f, -0.1f, new Color(0.3f, 0.65f, 0.85f));
+            stress = EnsureComponent("Stress", stress, "Tingkat ketegangan saraf dan pikiran.", 60f, 0f, 100f, 0f, 40f, 0f, 85f, 0.1f, new Color(0.9f, 0.6f, 0.75f));
+            sleepQuality = EnsureComponent("Tidur", sleepQuality, "Kualitas tidur dan pemulihan tubuh.", 55f, 0f, 100f, 60f, 100f, 30f, 100f, -0.3f, new Color(0.5f, 0.4f, 0.8f));
+            inflammation = EnsureComponent("Peradangan", inflammation, "Respon inflamasi sistemik dalam tubuh.", 45f, 0f, 100f, 0f, 35f, 0f, 70f, 0.05f, new Color(0.95f, 0.45f, 0.1f));
+            insulinEfficiency = EnsureComponent("Insulin Eff.", insulinEfficiency, "Efektivitas insulin dalam mengontrol gula darah.", 40f, 0f, 100f, 60f, 100f, 30f, 100f, -0.05f, new Color(0.2f, 0.65f, 0.6f));
+            toxicity = EnsureComponent("Toksin", toxicity, "Akumulasi zat beracun dalam tubuh.", 35f, 0f, 100f, 0f, 30f, 0f, 65f, 0.05f, new Color(0.45f, 0.75f, 0.45f));
+            metabolism = EnsureComponent("Metabolism", metabolism, "Laju metabolisme dasar tubuh.", 70f, 0f, 100f, 50f, 90f, 30f, 100f, 0f, Color.grey);
+            hydration = EnsureComponent("Hydration", hydration, "Kecukupan cairan dalam tubuh.", 80f, 0f, 100f, 60f, 100f, 35f, 100f, -0.4f, Color.grey);
+            oxygenLevel = EnsureComponent("Oxygen Level", oxygenLevel, "Tingkat kejenuhan oksigen dalam darah.", 98f, 0f, 100f, 95f, 100f, 90f, 100f, -0.05f, Color.grey);
+            heartStability = EnsureComponent("Heart Stability", heartStability, "Kestabilan detak jantung.", 90f, 0f, 100f, 70f, 100f, 50f, 100f, 0f, Color.grey);
+            hormoneBalance = EnsureComponent("Hormone Balance", hormoneBalance, "Keseimbangan hormon regulasi tubuh.", 80f, 0f, 100f, 60f, 100f, 40f, 100f, 0f, Color.grey);
 
             AddComponent("Energy", energy);
             AddComponent("BloodSugar", bloodSugar);

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using System.Collections.Generic;
 using ChronicSurvival.BodyComponents;
 
@@ -11,7 +12,7 @@ namespace ChronicSurvival.UI
 
         [Header("Layout")]
         [SerializeField] private Transform statsContainer;
-        [SerializeField] private bool showOnlyImportant = false;
+        [SerializeField] private bool showOnlyImportant = true;
 
         [Header("Important Stats")]
         [SerializeField] private List<string> importantStats = new List<string>
@@ -20,13 +21,27 @@ namespace ChronicSurvival.UI
             "BloodSugar",
             "BloodPressure",
             "ImmuneStrength",
-            "Stress"
+            "Inflammation",
+            "SleepQuality",
+            "Stress",
+            "Toxicity",
+            "InsulinEfficiency"
         };
 
         private Dictionary<string, BodyStatBar> statBars = new Dictionary<string, BodyStatBar>();
 
         private void Start()
         {
+            // Apply premium layout group spacing and padding at runtime for breathability
+            if (statsContainer != null)
+            {
+                VerticalLayoutGroup layoutGroup = statsContainer.GetComponent<VerticalLayoutGroup>();
+                if (layoutGroup != null)
+                {
+                    layoutGroup.spacing = 14f;
+                    layoutGroup.padding = new RectOffset(6, 6, 6, 6);
+                }
+            }
             InitializeStatBars();
         }
 
@@ -38,20 +53,29 @@ namespace ChronicSurvival.UI
                 return;
             }
 
-            var components = BodyComponentManager.Instance.GetAllComponents();
-
-            foreach (var kvp in components)
+            if (showOnlyImportant)
             {
-                string componentName = kvp.Key;
-                BodyComponent component = kvp.Value;
+                foreach (string componentName in importantStats)
+                {
+                    BodyComponent component = BodyComponentManager.Instance.GetComponent(componentName);
+                    if (component != null)
+                    {
+                        CreateStatBar(componentName, component);
+                    }
+                }
+            }
+            else
+            {
+                var components = BodyComponentManager.Instance.GetAllComponents();
+                foreach (var kvp in components)
+                {
+                    string componentName = kvp.Key;
+                    BodyComponent component = kvp.Value;
 
-                if (component == null) continue;
+                    if (component == null) continue;
 
-                // Skip if showing only important and this isn't important
-                if (showOnlyImportant && !importantStats.Contains(componentName))
-                    continue;
-
-                CreateStatBar(componentName, component);
+                    CreateStatBar(componentName, component);
+                }
             }
         }
 

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using ChronicSurvival.Core;
+using ChronicSurvival.Cards;
 using ChronicSurvival.Disease;
 using ChronicSurvival.Units;
 
@@ -63,7 +64,19 @@ namespace ChronicSurvival.UI
 
             if (eventDescriptionText != null)
             {
-                eventDescriptionText.text = descriptions[eventIndex] + "\n\nTekan tombol lanjutkan untuk menstabilkan sistem tubuh dan memulai Hari " + (currentDay + 1) + ".";
+                string cardNote = "";
+                if (CardBuffManager.Instance != null && !string.IsNullOrEmpty(CardBuffManager.Instance.LastCardName))
+                {
+                    string buff = CardBuffManager.Instance.GetBuffSummary();
+                    cardNote = $"\n\n<b>Kartu dipilih:</b> {CardBuffManager.Instance.LastCardName}";
+                    if (!string.IsNullOrEmpty(buff))
+                    {
+                        cardNote += $"\n<b>Bonus pertempuran berikutnya:</b> {buff}";
+                    }
+                }
+
+                eventDescriptionText.text = descriptions[eventIndex] + cardNote +
+                    "\n\nTekan tombol lanjutkan untuk menstabilkan sistem tubuh dan memulai Hari " + (currentDay + 1) + ".";
             }
 
             // Apply minor passive disease modifiers based on event to make the loop reactive!

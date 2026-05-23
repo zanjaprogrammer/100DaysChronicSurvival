@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a, type: 3}
+  m_Name: CardioExercise
+  m_EditorClassIdentifier: Assembly-CSharp::ChronicSurvival.Cards.ActionCard
+  cardName: Latihan Kardio
+  description: Olahraga kardio 30 menit menguatkan jantung.
+  icon: {fileID: 0}
+  rarity: 0
+  cardType: 0
+  effects:
+  - componentName: HeartStability
+    value: 10
+  - componentName: BloodPressure
+    value: -8
+  - componentName: Metabolism
+    value: 8
+  - componentName: Stress
+    value: -5
+  immuneAttackSpeedBonus: 0.06
+  immuneDamageBonus: 0
+  immuneMaxHealthBonus: 0
+  immuneStrengthBonus: 0
+  unlockAtDay: 1
+  isUnlocked: 1

@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using ChronicSurvival.Core;
+using ChronicSurvival.Cards;
 using ChronicSurvival.Units;
 
 namespace ChronicSurvival.Battle
@@ -49,15 +50,43 @@ namespace ChronicSurvival.Battle
             Instance = this;
         }
 
+        private void OnEnable()
+        {
+            ConnectToGameManager();
+            GameManager.OnInstanceReady += ConnectToGameManager;
+        }
+
         private void Start()
         {
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
-            }
+            ConnectToGameManager();
+        }
+
+        private void OnDisable()
+        {
+            GameManager.OnInstanceReady -= ConnectToGameManager;
+            DisconnectFromGameManager();
         }
 
         private void OnDestroy()
+        {
+            DisconnectFromGameManager();
+        }
+
+        /// <summary>Subscribe to game flow; catch up if we missed the Battle transition.</summary>
+        public void ConnectToGameManager()
+        {
+            if (GameManager.Instance == null) return;
+
+            GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
+            GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
+
+            if (GameManager.Instance.CurrentState == GameState.Battle && !battleActive)
+            {
+                StartGameplayBattle();
+            }
+        }
+
+        private void DisconnectFromGameManager()
         {
             if (GameManager.Instance != null)
             {
@@ -74,7 +103,7 @@ namespace ChronicSurvival.Battle
             else if (newState != GameState.Paused && newState != GameState.Initializing)
             {
                 // Stop spawning and clear units if state moves away from Battle/Pause
-                var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsSortMode.None);
+                var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 foreach (var node in infectionNodes)
                 {
                     if (node != null)
@@ -92,19 +121,25 @@ namespace ChronicSurvival.Battle
             // Clear any lingering units
             ClearAllUnits();
 
-            // Spawn immune units
-            UnitSpawner spawner = FindAnyObjectByType<UnitSpawner>();
-            if (spawner != null)
+            if (immuneCellPrefab == null)
             {
-                spawner.SpawnAllUnits();
+                Debug.LogWarning("[BattleManager] immuneCellPrefab belum di-assign! Sel imun tidak di-spawn, tapi battle tetap jalan.");
             }
             else
             {
-                Debug.LogWarning("[BattleManager] UnitSpawner not found in scene!");
+                UnitSpawner spawner = FindFirstObjectByType<UnitSpawner>(FindObjectsInactive.Include);
+                if (spawner != null)
+                {
+                    spawner.SpawnAllUnits();
+                }
+                else
+                {
+                    Debug.LogWarning("[BattleManager] UnitSpawner not found in scene!");
+                }
             }
 
             // Activate infection nodes
-            var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsSortMode.None);
+            var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (var node in infectionNodes)
             {
                 if (node != null)
@@ -190,6 +225,7 @@ namespace ChronicSurvival.Battle
             if (cell != null)
             {
                 cell.SetCellType(type);
+                CardBuffManager.Instance?.ApplyBuffsToUnit(cell);
                 cell.OnDeath += OnImmuneCellDeath;
                 immuneCells.Add(cell);
 

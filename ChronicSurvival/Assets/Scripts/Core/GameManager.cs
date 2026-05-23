@@ -11,10 +11,15 @@ namespace ChronicSurvival.Core
     {
         public static GameManager Instance { get; private set; }
 
+        /// <summary>Fired once when the GameManager singleton is ready (for late subscribers).</summary>
+        public static event System.Action OnInstanceReady;
+
         [Header("Game State")]
         [SerializeField] private GameState currentState = GameState.MainMenu;
         [SerializeField] private int currentDay = 1;
         [SerializeField] private const int MAX_DAYS = 100;
+
+        private bool hasInitializedState = false;
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = true;
@@ -43,6 +48,13 @@ namespace ChronicSurvival.Core
             DontDestroyOnLoad(gameObject);
 
             Initialize();
+            NotifyInstanceReady();
+        }
+
+        public static void NotifyInstanceReady()
+        {
+            if (Instance == null) return;
+            OnInstanceReady?.Invoke();
         }
 
         private void Initialize()
@@ -77,7 +89,8 @@ namespace ChronicSurvival.Core
 
         public void ChangeState(GameState newState)
         {
-            if (currentState == newState) return;
+            if (hasInitializedState && currentState == newState) return;
+            hasInitializedState = true;
 
             GameState previousState = currentState;
             currentState = newState;

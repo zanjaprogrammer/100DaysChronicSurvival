@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a, type: 3}
+  m_Name: EmergencyTreatment
+  m_EditorClassIdentifier: Assembly-CSharp::ChronicSurvival.Cards.ActionCard
+  cardName: Perawatan Darurat
+  description: Intervensi medis intensif menstabilkan kondisi kritis.
+  icon: {fileID: 0}
+  rarity: 4
+  cardType: 2
+  effects:
+  - componentName: ImmuneStrength
+    value: 30
+  - componentName: Inflammation
+    value: -20
+  - componentName: Toxicity
+    value: -15
+  - componentName: Energy
+    value: 15
+  immuneAttackSpeedBonus: 0.15
+  immuneDamageBonus: 0.15
+  immuneMaxHealthBonus: 0.2
+  immuneStrengthBonus: 0
+  unlockAtDay: 15
+  isUnlocked: 1

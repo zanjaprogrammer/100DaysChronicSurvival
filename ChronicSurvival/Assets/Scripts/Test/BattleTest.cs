@@ -34,7 +34,7 @@ namespace ChronicSurvival.Test
                 unitSpawner = FindAnyObjectByType<UnitSpawner>();
 
             if (infectionNodes == null || infectionNodes.Length == 0)
-                infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsSortMode.None);
+                infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             Debug.Log("[BattleTest] Battle Test initialized");
             Debug.Log($"[BattleTest] Controls:");

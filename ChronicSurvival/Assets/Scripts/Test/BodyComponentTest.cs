@@ -5,12 +5,6 @@ namespace ChronicSurvival.Test
 {
     public class BodyComponentTest : MonoBehaviour
     {
-        [Header("Test Actions")]
-        [SerializeField] private bool testStressIncrease = false;
-        [SerializeField] private bool testSleepDecrease = false;
-        [SerializeField] private bool testSugarIncrease = false;
-        [SerializeField] private bool testExercise = false;
-
         [Header("Test Values")]
         [SerializeField] private float testAmount = 10f;
 

@@ -285,6 +285,24 @@ namespace ChronicSurvival.Units
             currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
         }
 
+        /// <summary>
+        /// Applies multipliers from lifestyle card buffs (immune cells only).
+        /// </summary>
+        public void ApplyCombatMultipliers(float attackSpeedMult, float damageMult, float maxHealthMult)
+        {
+            if (attackSpeedMult <= 0f || damageMult <= 0f || maxHealthMult <= 0f)
+            {
+                return;
+            }
+
+            attackSpeed *= attackSpeedMult;
+            damage *= damageMult;
+
+            float healthRatio = maxHealth > 0f ? currentHealth / maxHealth : 1f;
+            maxHealth *= maxHealthMult;
+            currentHealth = Mathf.Min(maxHealth, currentHealth * healthRatio * maxHealthMult);
+        }
+
         protected virtual void OnDrawGizmosSelected()
         {
             Gizmos.color = Color.yellow;
