@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using ChronicSurvival.Core;
+using ChronicSurvival.Battle;
 
 namespace ChronicSurvival.UI
 {
@@ -360,6 +361,36 @@ namespace ChronicSurvival.UI
             UiFieldBinder.Set(topStatus, "inflammationValueText", inflSlot.valueText);
             UiFieldBinder.Set(topStatus, "inflammationFillBar", inflSlot.fillImage);
 
+            GameObject objectivePinned = CreateGlassPanel(panel.transform, "ObjectivePinnedPanel", new Vector2(0, -230), new Vector2(420, 90), 0.5f, 1f);
+            CreateTelemetryLabel(objectivePinned.transform, "PinnedHeader", "ACTIVE OBJECTIVE", new Vector2(-104, 24), new Vector2(220, 20), 10);
+            TextMeshProUGUI pinnedTitle = CreateTMP(objectivePinned.transform, "PinnedTitle", "No active objective", 16, COL_HEADER, FontStyles.Bold);
+            SetAnchored(pinnedTitle.gameObject, 0.5f, 0.5f, new Vector2(0, 2), new Vector2(330, 24));
+            pinnedTitle.alignment = TextAlignmentOptions.Left;
+            TextMeshProUGUI progressLabel = CreateTMP(objectivePinned.transform, "ProgressLabel", "", 12, COL_SUB);
+            SetAnchored(progressLabel.gameObject, 0.5f, 0.5f, new Vector2(0, -24), new Vector2(330, 20));
+            progressLabel.alignment = TextAlignmentOptions.Left;
+            GameObject progressTrack = CreatePanel(objectivePinned.transform, "ProgressTrack");
+            SetAnchored(progressTrack, 0.5f, 0.5f, new Vector2(0, -34), new Vector2(330, 10));
+            SetImage(progressTrack, COL_TRACK);
+            GameObject progressFill = CreatePanel(progressTrack.transform, "ProgressFill");
+            Stretch(progressFill);
+            Image progressFillImage = progressFill.GetComponent<Image>();
+            progressFillImage.color = COL_TEAL;
+            progressFillImage.type = Image.Type.Filled;
+            progressFillImage.fillMethod = Image.FillMethod.Horizontal;
+            progressFillImage.fillAmount = 0f;
+
+            GameObject objectivePopup = CreateGlassPanel(panel.transform, "ObjectivePopup", new Vector2(0, 40), new Vector2(500, 150), 0.5f, 0.5f);
+            CanvasGroup popupCanvasGroup = objectivePopup.AddComponent<CanvasGroup>();
+            CreateTelemetryLabel(objectivePopup.transform, "PopupHeader", "NEW OBJECTIVE", new Vector2(-138, 48), new Vector2(250, 22), 12);
+            TextMeshProUGUI popupTitle = CreateTMP(objectivePopup.transform, "PopupTitle", "", 24, COL_HEADER, FontStyles.Bold);
+            SetAnchored(popupTitle.gameObject, 0.5f, 0.5f, new Vector2(0, 12), new Vector2(420, 36));
+            popupTitle.alignment = TextAlignmentOptions.Center;
+            TextMeshProUGUI popupDescription = CreateTMP(objectivePopup.transform, "PopupDescription", "", 14, COL_SUB);
+            SetAnchored(popupDescription.gameObject, 0.5f, 0.5f, new Vector2(0, -32), new Vector2(420, 52));
+            popupDescription.alignment = TextAlignmentOptions.Center;
+            popupCanvasGroup.alpha = 0f;
+
             GameObject eventPanel = CreateGlassPanel(panel.transform, "ActiveEventPanel", new Vector2(-170, -238), new Vector2(340, 190), 1f, 1f);
             ActiveEventUI activeEv = eventPanel.AddComponent<ActiveEventUI>();
             TextMeshProUGUI evH = CreateTelemetryLabel(eventPanel.transform, "Header", "LIVE BIO-FEEDBACK", new Vector2(-92, 70), new Vector2(210, 20), 11);
@@ -379,6 +410,26 @@ namespace ChronicSurvival.UI
             SetAnchored(legendText.gameObject, 0.5f, 0.5f, new Vector2(4, -18), new Vector2(290, 130));
             legendText.alignment = TextAlignmentOptions.Left;
             legendText.lineSpacing = 10;
+
+            GameObject joystickRoot = CreateGlassPanel(panel.transform, "SquadJoystickPanel", new Vector2(170, 170), new Vector2(220, 220), 0f, 0f);
+            Image joystickRootImage = joystickRoot.GetComponent<Image>();
+            joystickRootImage.color = new Color(COL_PANEL.r, COL_PANEL.g, COL_PANEL.b, 0.58f);
+            GameObject stickArea = CreatePanel(joystickRoot.transform, "StickArea");
+            SetAnchored(stickArea, 0.5f, 0.5f, Vector2.zero, new Vector2(180, 180));
+            Image stickAreaImage = stickArea.GetComponent<Image>();
+            stickAreaImage.color = new Color(COL_TEAL.r, COL_TEAL.g, COL_TEAL.b, 0.10f);
+            GameObject stickRing = CreatePanel(stickArea.transform, "StickRing");
+            Stretch(stickRing);
+            stickRing.GetComponent<Image>().color = new Color(COL_TEAL.r, COL_TEAL.g, COL_TEAL.b, 0.18f);
+            GameObject stickHandle = CreatePanel(stickArea.transform, "StickHandle");
+            SetAnchored(stickHandle, 0.5f, 0.5f, Vector2.zero, new Vector2(72, 72));
+            stickHandle.GetComponent<Image>().color = new Color(COL_TEAL.r, COL_TEAL.g, COL_TEAL.b, 0.85f);
+            SquadJoystickUI joystick = joystickRoot.AddComponent<SquadJoystickUI>();
+            UiFieldBinder.Set(joystick, "stickArea", stickArea.GetComponent<RectTransform>());
+            UiFieldBinder.Set(joystick, "handle", stickHandle.GetComponent<RectTransform>());
+            UiFieldBinder.Set(joystick, "handleRange", 72f);
+
+            Button attackBtn = CreateButton(panel.transform, "AttackButton", "ATTACK", new Vector2(-170, 170), new Vector2(220, 86), 1f, 0f, new Color(0.18f, 0.08f, 0.09f, 0.95f));
 
             GameObject drawer = CreatePanel(panel.transform, "BodyStatsExpanded");
             RectTransform drawerRect = drawer.GetComponent<RectTransform>();
@@ -412,6 +463,18 @@ namespace ChronicSurvival.UI
             UiFieldBinder.Set(drawerUI, "expandedCanvasGroup", drawerCg);
             UiFieldBinder.Set(drawerUI, "expandButton", expandBtn);
             UiFieldBinder.Set(drawerUI, "expandArrowText", expandTxt);
+
+            ObjectiveHUDController objectiveHud = panel.AddComponent<ObjectiveHUDController>();
+            UiFieldBinder.Set(objectiveHud, "popupRoot", objectivePopup.GetComponent<RectTransform>());
+            UiFieldBinder.Set(objectiveHud, "popupCanvasGroup", popupCanvasGroup);
+            UiFieldBinder.Set(objectiveHud, "popupTitleText", popupTitle);
+            UiFieldBinder.Set(objectiveHud, "popupDescriptionText", popupDescription);
+            UiFieldBinder.Set(objectiveHud, "pinnedRoot", objectivePinned.GetComponent<RectTransform>());
+            UiFieldBinder.Set(objectiveHud, "pinnedTitleText", pinnedTitle);
+            UiFieldBinder.Set(objectiveHud, "progressLabelText", progressLabel);
+            UiFieldBinder.Set(objectiveHud, "progressFillImage", progressFillImage);
+            UiFieldBinder.Set(objectiveHud, "joystick", joystick);
+            UiFieldBinder.Set(objectiveHud, "attackButton", attackBtn);
 
             panel.transform.SetAsLastSibling();
             return panel;
@@ -844,16 +907,21 @@ namespace ChronicSurvival.UI
             return tmp;
         }
 
-        static Button CreateButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color bg)
+        static Button CreateButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, float ax, float ay, Color bg)
         {
             GameObject go = CreatePanel(parent, name);
-            SetAnchored(go, 0.5f, 0.5f, pos, size);
+            SetAnchored(go, ax, ay, pos, size);
             StylePanel(go, bg, new Color(COL_BORDER.r, COL_BORDER.g, COL_BORDER.b, 0.7f));
             Button btn = go.AddComponent<Button>();
             TextMeshProUGUI txt = CreateTMP(go.transform, "Text", label, 16, COL_HEADER, FontStyles.Bold);
             Stretch(txt.gameObject);
             txt.characterSpacing = 4;
             return btn;
+        }
+
+        static Button CreateButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color bg)
+        {
+            return CreateButton(parent, name, label, pos, size, 0.5f, 0.5f, bg);
         }
 
         static SummarySlot CreateSummarySlot(Transform parent, string id, string label, Color barColor)

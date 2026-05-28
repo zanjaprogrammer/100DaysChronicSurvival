@@ -52,6 +52,16 @@ namespace ChronicSurvival.Battle
             currentUnits[ImmuneCellType.Neutrophil] = startingNeutrophils;
         }
 
+        public Vector2 GetSquadSpawnCenter()
+        {
+            Vector2 center = spawnArea != null ? (Vector2)spawnArea.position : Vector2.zero;
+            if (ArenaWalkableMask.Instance != null)
+            {
+                center = ArenaWalkableMask.Instance.GetNearestWalkablePosition(center, 12f);
+            }
+            return center;
+        }
+
         public void SpawnAllUnits()
         {
             if (BattleManager.Instance == null)
@@ -60,35 +70,21 @@ namespace ChronicSurvival.Battle
                 return;
             }
 
-            List<Vector2> spawnPositions = GenerateSpawnPositions(GetTotalUnitCount());
-            int posIndex = 0;
-
-            foreach (var kvp in currentUnits)
+            ImmuneSquadController squadController = FindFirstObjectByType<ImmuneSquadController>(FindObjectsInactive.Include);
+            if (squadController == null)
             {
-                ImmuneCellType cellType = kvp.Key;
-                int count = kvp.Value;
-
-                for (int i = 0; i < count; i++)
-                {
-                    if (posIndex < spawnPositions.Count)
-                    {
-                        BattleManager.Instance.SpawnImmuneCell(cellType, spawnPositions[posIndex]);
-                        posIndex++;
-                    }
-                }
+                GameObject squadObject = new GameObject("ImmuneSquadController");
+                squadController = squadObject.AddComponent<ImmuneSquadController>();
             }
 
+            squadController.BuildSquad(GetSquadSpawnCenter());
             EventManager.TriggerEvent(GameEvents.UNITS_SPAWNED);
         }
 
         private List<Vector2> GenerateSpawnPositions(int count)
         {
             List<Vector2> positions = new List<Vector2>();
-            Vector2 center = spawnArea != null ? (Vector2)spawnArea.position : Vector2.zero;
-            if (ArenaWalkableMask.Instance != null)
-            {
-                center = ArenaWalkableMask.Instance.GetNearestWalkablePosition(center, 12f);
-            }
+            Vector2 center = GetSquadSpawnCenter();
 
             int rows = Mathf.CeilToInt(Mathf.Sqrt(count));
             int cols = Mathf.CeilToInt((float)count / rows);

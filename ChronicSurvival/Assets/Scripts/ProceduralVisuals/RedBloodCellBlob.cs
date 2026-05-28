@@ -5,11 +5,12 @@ namespace ChronicSurvival.ProceduralVisuals
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public class RedBloodCellBlob : MonoBehaviour
     {
-        [SerializeField] private int segments = 24;
+        [SerializeField] private int segments = 12;
         [SerializeField] private float radius = 0.48f;
         [SerializeField] private float rimIndent = 0.12f;
-        [SerializeField] private float wobbleAmount = 0.035f;
-        [SerializeField] private float wobbleSpeed = 1.6f;
+        [SerializeField] private float wobbleAmount = 0.008f;
+        [SerializeField] private float wobbleSpeed = 1.2f;
+        [SerializeField] private float pixelGridSize = 0.08f;
         [SerializeField] private Color fillColor = new Color(0.86f, 0.08f, 0.08f, 1f);
         [SerializeField] private Color shadeColor = new Color(0.58f, 0.02f, 0.02f, 1f);
 
@@ -32,8 +33,8 @@ namespace ChronicSurvival.ProceduralVisuals
         public void Configure(float cellRadius, Color color)
         {
             radius = cellRadius;
-            fillColor = color;
-            shadeColor = Color.Lerp(color, new Color(0.25f, 0f, 0f, 1f), 0.38f);
+            fillColor = QuantizeColor(color, 4);
+            shadeColor = QuantizeColor(Color.Lerp(color, new Color(0.25f, 0f, 0f, 1f), 0.38f), 4);
             BuildMesh();
             SetupMaterial();
         }
@@ -69,7 +70,7 @@ namespace ChronicSurvival.ProceduralVisuals
 
             vertices[0] = Vector3.zero;
             uv[0] = new Vector2(0.5f, 0.5f);
-            colors[0] = Color.Lerp(fillColor, Color.white, 0.12f);
+            colors[0] = QuantizeColor(Color.Lerp(fillColor, Color.white, 0.12f), 4);
 
             for (int i = 0; i < segments; i++)
             {
@@ -79,17 +80,18 @@ namespace ChronicSurvival.ProceduralVisuals
                 float verticalFlatten = 0.82f;
                 float dimple = 1f - Mathf.Pow(Mathf.Sin(angle), 2f) * rimIndent;
                 float edgeNoise = Mathf.PerlinNoise(Mathf.Cos(angle) * 1.7f + timeOffset, Mathf.Sin(angle) * 1.7f + timeOffset);
-                float edgeRadius = radius * dimple * (0.94f + (edgeNoise - 0.5f) * 0.08f);
+                float edgeRadius = radius * dimple * (0.95f + (edgeNoise - 0.5f) * 0.04f);
 
-                vertices[i + 1] = new Vector3(
+                Vector3 vertex = new Vector3(
                     Mathf.Cos(angle) * edgeRadius * horizontalFlatten,
                     Mathf.Sin(angle) * edgeRadius * verticalFlatten,
                     0f
                 );
+                vertices[i + 1] = QuantizeVertex(vertex);
                 uv[i + 1] = new Vector2(Mathf.Cos(angle) * 0.5f + 0.5f, Mathf.Sin(angle) * 0.5f + 0.5f);
 
                 float highlight = Mathf.Clamp01(Vector2.Dot(new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)), new Vector2(-0.65f, 0.75f)) * 0.5f + 0.5f);
-                colors[i + 1] = Color.Lerp(shadeColor, fillColor, 0.5f + highlight * 0.5f);
+                colors[i + 1] = QuantizeColor(Color.Lerp(shadeColor, fillColor, 0.5f + highlight * 0.5f), 4);
             }
 
             for (int i = 0; i < segments; i++)
@@ -110,7 +112,7 @@ namespace ChronicSurvival.ProceduralVisuals
 
         private void Update()
         {
-            if (mesh == null || baseVertices == null) return;
+            if (mesh == null || baseVertices == null || wobbleAmount <= 0f) return;
 
             Vector3[] vertices = mesh.vertices;
             float time = Time.time * wobbleSpeed + timeOffset;
@@ -118,11 +120,38 @@ namespace ChronicSurvival.ProceduralVisuals
             {
                 float angle = Mathf.Atan2(baseVertices[i].y, baseVertices[i].x);
                 float wobble = Mathf.Sin(time + angle * 2.5f) * wobbleAmount;
-                vertices[i] = baseVertices[i] * (1f + wobble);
+                vertices[i] = QuantizeVertex(baseVertices[i] * (1f + wobble));
             }
 
             mesh.vertices = vertices;
             mesh.RecalculateBounds();
+        }
+
+        private Vector3 QuantizeVertex(Vector3 vertex)
+        {
+            if (pixelGridSize <= 0f) return vertex;
+            return new Vector3(
+                Mathf.Round(vertex.x / pixelGridSize) * pixelGridSize,
+                Mathf.Round(vertex.y / pixelGridSize) * pixelGridSize,
+                vertex.z
+            );
+        }
+
+        private static float Quantize01(float value, int steps)
+        {
+            value = Mathf.Clamp01(value);
+            if (steps <= 1) return value;
+            return Mathf.Round(value * (steps - 1)) / (steps - 1);
+        }
+
+        private static Color QuantizeColor(Color color, int steps)
+        {
+            return new Color(
+                Quantize01(color.r, steps),
+                Quantize01(color.g, steps),
+                Quantize01(color.b, steps),
+                color.a
+            );
         }
     }
 }

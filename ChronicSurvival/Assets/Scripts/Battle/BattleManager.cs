@@ -4,6 +4,7 @@ using ChronicSurvival.Core;
 using ChronicSurvival.Cards;
 using ChronicSurvival.Units;
 using ChronicSurvival.ProceduralVisuals;
+using ChronicSurvival.Arena;
 
 namespace ChronicSurvival.Battle
 {
@@ -13,7 +14,7 @@ namespace ChronicSurvival.Battle
 
         [Header("Battle Settings")]
         [SerializeField] private float battleDuration = 60f;
-        [SerializeField] private bool useTimer = true;
+        [SerializeField] private bool useTimer = false;
 
         [Header("Spawn Areas")]
         [SerializeField] private Transform immuneSpawnArea;
@@ -24,15 +25,16 @@ namespace ChronicSurvival.Battle
         [SerializeField] private GameObject immuneCellPrefab;
         [SerializeField] private GameObject enemyPrefab;
 
-        [Header("Temporary Flow Simulation")]
-        [SerializeField] private bool spawnGameplayUnits = false;
+        [Header("Gameplay Mode")]
+        [SerializeField] private bool spawnGameplayUnits = true;
         [SerializeField] private bool allowBattleGameOver = false;
+        [SerializeField] private bool useObjectiveDrivenMode = true;
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = true;
 
-        private List<ImmuneCell> immuneCells = new List<ImmuneCell>();
-        private List<Enemy> enemies = new List<Enemy>();
+        private readonly List<ImmuneCell> immuneCells = new List<ImmuneCell>();
+        private readonly List<Enemy> enemies = new List<Enemy>();
         private float battleTimer;
         private bool battleActive = false;
 
@@ -40,6 +42,8 @@ namespace ChronicSurvival.Battle
         public float BattleTimer => battleTimer;
         public int ImmuneCount => immuneCells.Count;
         public int EnemyCount => enemies.Count;
+        public IReadOnlyList<Enemy> Enemies => enemies;
+        public IReadOnlyList<ImmuneCell> ImmuneCells => immuneCells;
 
         public System.Action OnBattleStart;
         public System.Action<bool> OnBattleEnd;
@@ -77,7 +81,6 @@ namespace ChronicSurvival.Battle
             DisconnectFromGameManager();
         }
 
-        /// <summary>Subscribe to game flow; catch up if we missed the Battle transition.</summary>
         public void ConnectToGameManager()
         {
             if (GameManager.Instance == null) return;
@@ -107,7 +110,6 @@ namespace ChronicSurvival.Battle
             }
             else if (newState != GameState.Paused && newState != GameState.Initializing)
             {
-                // Stop spawning and clear units if state moves away from Battle/Pause
                 var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 foreach (var node in infectionNodes)
                 {
@@ -124,11 +126,10 @@ namespace ChronicSurvival.Battle
             if (debugMode) Debug.Log("[BattleManager] Transitioned to Battle state.");
 
             ClearAllUnits();
+            EnsureRuntimeDefaults();
 
             if (spawnGameplayUnits)
             {
-                EnsureRuntimeDefaults();
-
                 UnitSpawner spawner = FindFirstObjectByType<UnitSpawner>(FindObjectsInactive.Include);
                 if (spawner != null)
                 {
@@ -138,7 +139,10 @@ namespace ChronicSurvival.Battle
                 {
                     Debug.LogWarning("[BattleManager] UnitSpawner not found in scene!");
                 }
+            }
 
+            if (!useObjectiveDrivenMode)
+            {
                 var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
                 foreach (var node in infectionNodes)
                 {
@@ -164,7 +168,23 @@ namespace ChronicSurvival.Battle
                 spawnerObj.AddComponent<UnitSpawner>();
             }
 
-            if (FindFirstObjectByType<InfectionNode>(FindObjectsInactive.Include) == null)
+            if (FindFirstObjectByType<CancerObjectiveController>(FindObjectsInactive.Include) == null)
+            {
+                new GameObject("CancerObjectiveController").AddComponent<CancerObjectiveController>();
+            }
+
+            if (useObjectiveDrivenMode)
+            {
+                var infectionNodes = FindObjectsByType<InfectionNode>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (var node in infectionNodes)
+                {
+                    if (node != null)
+                    {
+                        node.DeactivateNode();
+                    }
+                }
+            }
+            else if (FindFirstObjectByType<InfectionNode>(FindObjectsInactive.Include) == null)
             {
                 CreateRuntimeNode("DiabetesNode", DiseaseType.Diabetes, new Vector2(9f, 1.8f));
                 CreateRuntimeNode("HypertensionNode", DiseaseType.Hypertension, new Vector2(-8f, 3.4f));
@@ -270,7 +290,10 @@ namespace ChronicSurvival.Battle
 
             if (debugMode) Debug.Log($"[BattleManager] Battle ended! Victory: {victory}");
 
-            GameManager.Instance?.EndBattle(victory);
+            if (!useObjectiveDrivenMode)
+            {
+                GameManager.Instance?.EndBattle(victory);
+            }
         }
 
         private void CleanupDeadUnits()
@@ -291,14 +314,37 @@ namespace ChronicSurvival.Battle
             }
         }
 
-        public ImmuneCell SpawnImmuneCell(ImmuneCellType type, Vector2? position = null)
+        public ImmuneCell SpawnSquadImmuneCell(ImmuneSquadRole role, Vector2 position)
         {
-            Vector2 spawnPos = position ?? GetRandomSpawnPosition(immuneSpawnArea);
-            
+            Vector2 spawnPos = GetSafeSpawnPosition(position);
             GameObject obj = Instantiate(immuneCellPrefab, spawnPos, Quaternion.identity);
             obj.SetActive(true);
             ImmuneCell cell = obj.GetComponent<ImmuneCell>();
-            
+
+            if (cell != null)
+            {
+                cell.ConfigureSquadRole(role);
+                cell.SetAutonomousCombat(false);
+                CardBuffManager.Instance?.ApplyBuffsToUnit(cell);
+                cell.OnDeath += OnImmuneCellDeath;
+                immuneCells.Add(cell);
+
+                EventManager.TriggerEvent(GameEvents.UNIT_SPAWNED, cell);
+
+                if (debugMode) Debug.Log($"[BattleManager] Spawned squad {role}");
+            }
+
+            return cell;
+        }
+
+        public ImmuneCell SpawnImmuneCell(ImmuneCellType type, Vector2? position = null)
+        {
+            Vector2 spawnPos = GetSafeSpawnPosition(position ?? GetRandomSpawnPosition(immuneSpawnArea));
+
+            GameObject obj = Instantiate(immuneCellPrefab, spawnPos, Quaternion.identity);
+            obj.SetActive(true);
+            ImmuneCell cell = obj.GetComponent<ImmuneCell>();
+
             if (cell != null)
             {
                 cell.SetCellType(type);
@@ -307,7 +353,7 @@ namespace ChronicSurvival.Battle
                 immuneCells.Add(cell);
 
                 EventManager.TriggerEvent(GameEvents.UNIT_SPAWNED, cell);
-                
+
                 if (debugMode) Debug.Log($"[BattleManager] Spawned {type}");
             }
 
@@ -316,12 +362,12 @@ namespace ChronicSurvival.Battle
 
         public Enemy SpawnEnemy(EnemyType type, DiseaseType disease, Vector2? position = null)
         {
-            Vector2 spawnPos = position ?? GetRandomSpawnPosition(enemySpawnArea);
-            
+            Vector2 spawnPos = GetSafeSpawnPosition(position ?? GetRandomSpawnPosition(enemySpawnArea));
+
             GameObject obj = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
             obj.SetActive(true);
             Enemy enemy = obj.GetComponent<Enemy>();
-            
+
             if (enemy != null)
             {
                 enemy.SetEnemyType(type, disease);
@@ -329,11 +375,21 @@ namespace ChronicSurvival.Battle
                 enemies.Add(enemy);
 
                 EventManager.TriggerEvent(GameEvents.ENEMY_SPAWNED, enemy);
-                
+
                 if (debugMode) Debug.Log($"[BattleManager] Spawned {disease} {type}");
             }
 
             return enemy;
+        }
+
+        private Vector2 GetSafeSpawnPosition(Vector2 position)
+        {
+            if (ArenaWalkableMask.Instance != null)
+            {
+                return ArenaWalkableMask.Instance.GetNearestWalkablePosition(position, 10f);
+            }
+
+            return position;
         }
 
         private Vector2 GetRandomSpawnPosition(Transform spawnArea)
@@ -347,12 +403,12 @@ namespace ChronicSurvival.Battle
 
         private void OnImmuneCellDeath(Unit unit)
         {
-            if (debugMode) Debug.Log($"[BattleManager] Immune cell died");
+            if (debugMode) Debug.Log("[BattleManager] Immune cell died");
         }
 
         private void OnEnemyDeath(Unit unit)
         {
-            if (debugMode) Debug.Log($"[BattleManager] Enemy died");
+            if (debugMode) Debug.Log("[BattleManager] Enemy died");
         }
 
         public void ClearAllUnits()
@@ -369,6 +425,9 @@ namespace ChronicSurvival.Battle
 
             immuneCells.Clear();
             enemies.Clear();
+
+            ImmuneSquadController squadController = FindFirstObjectByType<ImmuneSquadController>(FindObjectsInactive.Include);
+            squadController?.ClearSquad();
         }
 
         private void OnDrawGizmos()

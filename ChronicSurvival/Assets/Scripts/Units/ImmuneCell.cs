@@ -5,7 +5,10 @@ namespace ChronicSurvival.Units
 {
     public class ImmuneCell : Unit
     {
-        [Header("Immune Cell Type")]
+        [Header("Squad Role")]
+        [SerializeField] private ImmuneSquadRole squadRole = ImmuneSquadRole.Officer;
+
+        [Header("Legacy Type")]
         [SerializeField] private ImmuneCellType cellType;
         [SerializeField] private BlobPreset visualPreset;
 
@@ -16,6 +19,8 @@ namespace ChronicSurvival.Units
         private float abilityTimer;
 
         public ImmuneCellType CellType => cellType;
+        public ImmuneSquadRole SquadRole => squadRole;
+        public bool IsLeader => squadRole == ImmuneSquadRole.Leader;
 
         protected override void Awake()
         {
@@ -26,12 +31,7 @@ namespace ChronicSurvival.Units
         protected override void Start()
         {
             base.Start();
-            
-            if (blobVisual != null)
-            {
-                blobVisual.ApplyPreset(visualPreset);
-            }
-
+            ApplyCurrentVisual();
             abilityTimer = abilityCooldown;
         }
 
@@ -52,7 +52,39 @@ namespace ChronicSurvival.Units
 
         protected virtual void UseSpecialAbility()
         {
-            // Override in specific cell types
+        }
+
+        public void ConfigureSquadRole(ImmuneSquadRole role)
+        {
+            squadRole = role;
+            if (role == ImmuneSquadRole.Leader)
+            {
+                maxHealth = 180f;
+                damage = 22f;
+                attackSpeed = 1.15f;
+                moveSpeed = 2.6f;
+                detectionRange = 6.5f;
+                attackRange = 1.2f;
+                if (currentHealth > 0f)
+                {
+                    currentHealth = Mathf.Min(currentHealth, maxHealth);
+                }
+            }
+            else
+            {
+                maxHealth = 120f;
+                damage = 15f;
+                attackSpeed = 1.0f;
+                moveSpeed = 2.35f;
+                detectionRange = 5.5f;
+                attackRange = 1.05f;
+                if (currentHealth > 0f)
+                {
+                    currentHealth = Mathf.Min(currentHealth, maxHealth);
+                }
+            }
+
+            ApplyCurrentVisual();
         }
 
         public void SetCellType(ImmuneCellType type)
@@ -108,11 +140,37 @@ namespace ChronicSurvival.Units
             }
 
             currentHealth = maxHealth;
-            
-            if (blobVisual != null)
+            ApplyCurrentVisual();
+        }
+
+        private void ApplyCurrentVisual()
+        {
+            if (blobVisual == null)
             {
-                blobVisual.ApplyPreset(visualPreset);
+                return;
             }
+
+            if (squadRole == ImmuneSquadRole.Leader)
+            {
+                blobVisual.SetColors(
+                    new Color(0.08f, 0.21f, 0.56f, 1f),
+                    new Color(0.20f, 0.42f, 0.85f, 0.48f));
+                blobVisual.SetSize(0.7f);
+                blobVisual.SetAnimationSpeed(0.85f);
+                return;
+            }
+
+            if (squadRole == ImmuneSquadRole.Officer)
+            {
+                blobVisual.SetColors(
+                    new Color(0.23f, 0.63f, 0.95f, 1f),
+                    new Color(0.48f, 0.80f, 1f, 0.45f));
+                blobVisual.SetSize(0.52f);
+                blobVisual.SetAnimationSpeed(1.05f);
+                return;
+            }
+
+            blobVisual.ApplyPreset(visualPreset);
         }
     }
 
@@ -123,5 +181,12 @@ namespace ChronicSurvival.Units
         BCell,
         NKCell,
         Neutrophil
+    }
+
+    public enum ImmuneSquadRole
+    {
+        Leader,
+        Officer,
+        Legacy
     }
 }

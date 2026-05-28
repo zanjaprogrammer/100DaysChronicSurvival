@@ -38,11 +38,22 @@ namespace ChronicSurvival.Units
         protected Rigidbody2D rb;
         protected CircleCollider2D col;
 
+        private Vector2 wanderTarget;
+        private float wanderTimer;
+        [SerializeField] protected float wanderInterval = 3f;
+        [SerializeField] protected float wanderRadius = 2f;
+
+        private bool usesAutonomousCombat = true;
+
         public float CurrentHealth => currentHealth;
         public float MaxHealth => maxHealth;
         public bool IsDead => isDead;
         public UnitTeam Team => team;
         public Unit CurrentTarget => currentTarget;
+        public float MoveSpeed => moveSpeed;
+        public float AttackRange => attackRange;
+        public float DetectionRange => detectionRange;
+        public bool UsesAutonomousCombat => usesAutonomousCombat;
 
         public System.Action<Unit> OnDeath;
         public System.Action<float> OnDamaged;
@@ -65,20 +76,19 @@ namespace ChronicSurvival.Units
             attackCooldown = 0f;
         }
 
-        // Idle wander
-        private Vector2 wanderTarget;
-        private float wanderTimer;
-        [SerializeField] protected float wanderInterval = 3f;
-        [SerializeField] protected float wanderRadius = 2f;
-
         protected virtual void Update()
         {
             if (isDead) return;
 
             attackCooldown -= Time.deltaTime;
 
+            if (!usesAutonomousCombat)
+            {
+                return;
+            }
+
             FindTarget();
-            
+
             if (currentTarget != null)
             {
                 MoveTowardsTarget();
@@ -86,9 +96,98 @@ namespace ChronicSurvival.Units
             }
             else
             {
-                // Wander idle within blood vessels
                 WanderIdle();
             }
+        }
+
+        public void SetAutonomousCombat(bool enabled)
+        {
+            usesAutonomousCombat = enabled;
+            if (enabled) return;
+
+            ClearTarget();
+            StopMovement();
+        }
+
+        public void SetTarget(Unit target)
+        {
+            currentTarget = target != null && !target.IsDead ? target : null;
+        }
+
+        public void ClearTarget()
+        {
+            currentTarget = null;
+            currentPath = null;
+            currentPathIndex = 0;
+        }
+
+        public void StopMovement()
+        {
+            currentPath = null;
+            currentPathIndex = 0;
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+            }
+        }
+
+        public void MoveToPoint(Vector2 destination, float stoppingDistance = 0.25f, float speedMultiplier = 1f)
+        {
+            if (isDead || rb == null)
+            {
+                return;
+            }
+
+            pathRecalculateTimer -= Time.deltaTime;
+            if (currentPath == null || currentPath.Count == 0 || pathRecalculateTimer <= 0f)
+            {
+                currentPath = CalculatePathTo(destination);
+                currentPathIndex = 0;
+                pathRecalculateTimer = pathRecalculateInterval + Random.Range(-0.05f, 0.05f);
+            }
+
+            if (AdvancePath(ref destination, stoppingDistance))
+            {
+                return;
+            }
+
+            Vector2 direction = (destination - (Vector2)transform.position).normalized;
+            MoveInDirection(direction, speedMultiplier);
+        }
+
+        public void MoveDirectly(Vector2 direction, float speedMultiplier = 1f)
+        {
+            currentPath = null;
+            currentPathIndex = 0;
+            MoveInDirection(direction, speedMultiplier);
+        }
+
+        public bool IsWithinAttackRange(Unit target)
+        {
+            return target != null && !target.IsDead && Vector2.Distance(transform.position, target.transform.position) <= attackRange;
+        }
+
+        public bool TryAttackAssignedTarget()
+        {
+            if (currentTarget == null || currentTarget.IsDead)
+            {
+                ClearTarget();
+                return false;
+            }
+
+            if (attackCooldown > 0f)
+            {
+                return false;
+            }
+
+            if (!IsWithinAttackRange(currentTarget))
+            {
+                return false;
+            }
+
+            Attack(currentTarget);
+            attackCooldown = 1f / attackSpeed;
+            return true;
         }
 
         protected virtual void FindTarget()
@@ -104,7 +203,7 @@ namespace ChronicSurvival.Units
             float closestDistance = detectionRange;
 
             Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, detectionRange);
-            
+
             foreach (var col in colliders)
             {
                 Unit unit = col.GetComponent<Unit>();
@@ -125,64 +224,14 @@ namespace ChronicSurvival.Units
             if (currentTarget == null) return;
 
             float distance = Vector2.Distance(transform.position, currentTarget.transform.position);
-            
+
             if (distance > attackRange)
             {
-                pathRecalculateTimer -= Time.deltaTime;
-
-                // Request new path periodically or if we don't have one
-                if (currentPath == null || currentPath.Count == 0 || pathRecalculateTimer <= 0f)
-                {
-                    if (BloodstreamPathfinder.Instance != null)
-                    {
-                        currentPath = BloodstreamPathfinder.Instance.FindPath(transform.position, currentTarget.transform.position);
-                        currentPathIndex = 0;
-                    }
-                    else
-                    {
-                        currentPath = new List<Vector2> { currentTarget.transform.position };
-                        currentPathIndex = 0;
-                    }
-                    pathRecalculateTimer = pathRecalculateInterval + Random.Range(-0.05f, 0.05f);
-                }
-
-                // Follow the path
-                if (currentPath != null && currentPathIndex < currentPath.Count)
-                {
-                    Vector2 targetWaypoint = currentPath[currentPathIndex];
-                    
-                    // If we reached the waypoint, advance to next
-                    if (Vector2.Distance(transform.position, targetWaypoint) < 0.4f)
-                    {
-                        currentPathIndex++;
-                        if (currentPathIndex < currentPath.Count)
-                        {
-                            targetWaypoint = currentPath[currentPathIndex];
-                        }
-                    }
-
-                    Vector2 direction = (targetWaypoint - (Vector2)transform.position).normalized;
-                    Vector2 desiredPos = (Vector2)transform.position + direction * moveSpeed * Time.deltaTime;
-
-                    if (ArenaWalkableMask.Instance != null)
-                    {
-                        desiredPos = ArenaWalkableMask.Instance.ConstrainMovement(transform.position, desiredPos);
-                        direction = (desiredPos - (Vector2)transform.position).normalized;
-                    }
-
-                    rb.linearVelocity = direction * moveSpeed;
-                }
-                else
-                {
-                    // Fallback to straight movement
-                    Vector2 direction = ((Vector2)currentTarget.transform.position - (Vector2)transform.position).normalized;
-                    rb.linearVelocity = direction * moveSpeed;
-                }
+                MoveToPoint(currentTarget.transform.position, attackRange * 0.85f);
             }
             else
             {
-                rb.linearVelocity = Vector2.zero;
-                currentPath = null;
+                StopMovement();
             }
         }
 
@@ -192,7 +241,6 @@ namespace ChronicSurvival.Units
 
             if (wanderTimer <= 0f)
             {
-                // Pick a new random walkable wander target
                 Vector2 randomOffset = Random.insideUnitCircle * wanderRadius;
                 Vector2 candidate = (Vector2)transform.position + randomOffset;
 
@@ -208,10 +256,9 @@ namespace ChronicSurvival.Units
             float distToWander = Vector2.Distance(transform.position, wanderTarget);
             if (distToWander > 0.3f)
             {
-                Vector2 direction = (wanderTarget - (Vector2)transform.position).normalized;
-                rb.linearVelocity = direction * moveSpeed * 0.4f; // Slower when wandering
+                MoveToPoint(wanderTarget, 0.25f, 0.4f);
             }
-            else
+            else if (rb != null)
             {
                 rb.linearVelocity = Vector2.Lerp(rb.linearVelocity, Vector2.zero, Time.deltaTime * 3f);
             }
@@ -219,16 +266,7 @@ namespace ChronicSurvival.Units
 
         protected virtual void TryAttack()
         {
-            if (currentTarget == null) return;
-            if (attackCooldown > 0) return;
-
-            float distance = Vector2.Distance(transform.position, currentTarget.transform.position);
-            
-            if (distance <= attackRange)
-            {
-                Attack(currentTarget);
-                attackCooldown = 1f / attackSpeed;
-            }
+            TryAttackAssignedTarget();
         }
 
         protected virtual void Attack(Unit target)
@@ -239,7 +277,7 @@ namespace ChronicSurvival.Units
 
         protected virtual void OnAttackPerformed()
         {
-            if (blobPhysics != null)
+            if (blobPhysics != null && currentTarget != null)
             {
                 Vector2 impulse = (transform.position - currentTarget.transform.position).normalized * 0.5f;
                 blobPhysics.AddImpulse(impulse);
@@ -285,9 +323,6 @@ namespace ChronicSurvival.Units
             currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
         }
 
-        /// <summary>
-        /// Applies multipliers from lifestyle card buffs (immune cells only).
-        /// </summary>
         public void ApplyCombatMultipliers(float attackSpeedMult, float damageMult, float maxHealthMult)
         {
             if (attackSpeedMult <= 0f || damageMult <= 0f || maxHealthMult <= 0f)
@@ -310,6 +345,76 @@ namespace ChronicSurvival.Units
 
             Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(transform.position, attackRange);
+        }
+
+        private List<Vector2> CalculatePathTo(Vector2 destination)
+        {
+            if (BloodstreamPathfinder.Instance != null)
+            {
+                return BloodstreamPathfinder.Instance.FindPath(transform.position, destination);
+            }
+
+            return new List<Vector2> { destination };
+        }
+
+        private bool AdvancePath(ref Vector2 destination, float stoppingDistance)
+        {
+            if (currentPath == null || currentPathIndex >= currentPath.Count)
+            {
+                return false;
+            }
+
+            Vector2 targetWaypoint = currentPath[currentPathIndex];
+            if (Vector2.Distance(transform.position, targetWaypoint) < 0.4f)
+            {
+                currentPathIndex++;
+                if (currentPathIndex < currentPath.Count)
+                {
+                    targetWaypoint = currentPath[currentPathIndex];
+                }
+                else
+                {
+                    targetWaypoint = destination;
+                }
+            }
+
+            destination = targetWaypoint;
+            if (Vector2.Distance(transform.position, destination) <= stoppingDistance)
+            {
+                StopMovement();
+                return true;
+            }
+
+            return false;
+        }
+
+        private void MoveInDirection(Vector2 direction, float speedMultiplier)
+        {
+            if (rb == null)
+            {
+                return;
+            }
+
+            if (direction.sqrMagnitude <= 0.0001f)
+            {
+                rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
+            Vector2 normalized = direction.normalized;
+            Vector2 desiredPos = (Vector2)transform.position + normalized * moveSpeed * Mathf.Max(speedMultiplier, 0f) * Time.deltaTime;
+
+            if (ArenaWalkableMask.Instance != null)
+            {
+                desiredPos = ArenaWalkableMask.Instance.ConstrainMovement(transform.position, desiredPos);
+                normalized = desiredPos - (Vector2)transform.position;
+                if (normalized.sqrMagnitude > 0.0001f)
+                {
+                    normalized.Normalize();
+                }
+            }
+
+            rb.linearVelocity = normalized * moveSpeed * Mathf.Max(speedMultiplier, 0f);
         }
     }
 
