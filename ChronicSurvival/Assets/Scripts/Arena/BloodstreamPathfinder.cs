@@ -69,6 +69,8 @@ namespace ChronicSurvival.Arena
         {
             if (ArenaWalkableMask.Instance == null)
             {
+                isInitialized = false;
+                grid = null;
                 Debug.LogError("[BloodstreamPathfinder] ArenaWalkableMask.Instance is null! Cannot initialize grid.");
                 return;
             }
@@ -131,8 +133,21 @@ namespace ChronicSurvival.Arena
         {
             if (!isInitialized)
             {
+                TryInitializeIfNeeded();
                 // If not initialized, fallback to straight line
-                return new List<Vector2> { endPos };
+                if (!isInitialized || grid == null)
+                {
+                    return new List<Vector2> { endPos };
+                }
+            }
+
+            if (grid == null || grid.GetLength(0) != gridWidth || grid.GetLength(1) != gridHeight)
+            {
+                TryInitializeIfNeeded();
+                if (grid == null)
+                {
+                    return new List<Vector2> { endPos };
+                }
             }
 
             Vector2Int startGrid = GetGridPosition(startPos);
@@ -226,6 +241,17 @@ namespace ChronicSurvival.Arena
 
             // Path not found, fallback to straight line target
             return new List<Vector2> { endPos };
+        }
+        
+        private void TryInitializeIfNeeded()
+        {
+            if (ArenaWalkableMask.Instance == null)
+            {
+                isInitialized = false;
+                return;
+            }
+
+            InitializeGrid();
         }
 
         private List<Vector2> RetracePath(Node startNode, Node endNode)

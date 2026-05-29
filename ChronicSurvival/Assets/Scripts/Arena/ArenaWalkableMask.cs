@@ -15,6 +15,7 @@ namespace ChronicSurvival.Arena
     public class ArenaWalkableMask : MonoBehaviour
     {
         public static ArenaWalkableMask Instance { get; private set; }
+        public bool IsInitialized => isInitialized;
 
         [Header("Walkable Mask")]
         [SerializeField] private Texture2D walkableMask;
@@ -87,7 +88,7 @@ namespace ChronicSurvival.Arena
 
         public bool IsWalkable(Vector2 worldPosition)
         {
-            if (!isInitialized) return true; // Fallback: allow all if not initialized
+            if (!isInitialized) return false; // Fallback: block movement if mask is unavailable
 
             // Convert world position to UV (0-1)
             float u = Mathf.InverseLerp(arenaBoundsMin.x, arenaBoundsMax.x, worldPosition.x);
@@ -108,12 +109,41 @@ namespace ChronicSurvival.Arena
             return brightness >= walkableThreshold;
         }
 
+        public bool IsWalkableWithRadius(Vector2 worldPosition, float radius, int radialSamples = 8)
+        {
+            if (radius <= 0.001f)
+            {
+                return IsWalkable(worldPosition);
+            }
+
+            if (!IsWalkable(worldPosition))
+            {
+                return false;
+            }
+
+            radialSamples = Mathf.Max(4, radialSamples);
+            for (int i = 0; i < radialSamples; i++)
+            {
+                float angle = (i / (float)radialSamples) * Mathf.PI * 2f;
+                Vector2 edge = worldPosition + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+                if (!IsWalkable(edge))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// Get the nearest walkable position to a given world position.
         /// Searches in expanding circles until a walkable position is found.
         /// </summary>
         public Vector2 GetNearestWalkablePosition(Vector2 worldPosition, float maxSearchRadius = 3f)
         {
+            if (!isInitialized)
+                return worldPosition;
+
             if (IsWalkable(worldPosition))
                 return worldPosition;
 
@@ -139,7 +169,45 @@ namespace ChronicSurvival.Arena
             if (debugMode)
                 Debug.LogWarning($"[ArenaWalkableMask] Could not find walkable pos near {worldPosition}");
 
-            return worldPosition;
+            return FindNearestWalkableByGridSearch(worldPosition);
+        }
+
+        public Vector2 GetNearestWalkablePosition(Vector2 worldPosition, float maxSearchRadius, float radius, int radialSamples = 8)
+        {
+            if (!isInitialized)
+                return worldPosition;
+
+            if (IsWalkableWithRadius(worldPosition, radius, radialSamples))
+                return worldPosition;
+
+            float searchStep = 0.2f;
+            for (float searchRadius = searchStep; searchRadius <= maxSearchRadius; searchRadius += searchStep)
+            {
+                for (int i = 0; i < 24; i++)
+                {
+                    float angle = (i / 24f) * Mathf.PI * 2f;
+                    Vector2 testPos = worldPosition + new Vector2(
+                        Mathf.Cos(angle) * searchRadius,
+                        Mathf.Sin(angle) * searchRadius
+                    );
+
+                    if (IsWalkableWithRadius(testPos, radius, radialSamples))
+                        return testPos;
+                }
+            }
+
+            Vector2 fallback = FindNearestWalkableByGridSearch(worldPosition);
+            if (IsWalkableWithRadius(fallback, radius, radialSamples))
+                return fallback;
+
+            // Relax radius as a final fallback so units never remain inside black zones.
+            for (float relax = radius * 0.85f; relax >= 0.02f; relax *= 0.75f)
+            {
+                if (IsWalkableWithRadius(fallback, relax, radialSamples))
+                    return fallback;
+            }
+
+            return fallback;
         }
 
         /// <summary>
@@ -189,6 +257,62 @@ namespace ChronicSurvival.Arena
             }
 
             return validPos;
+        }
+
+        public Vector2 ConstrainMovement(Vector2 currentPos, Vector2 desiredPos, float radius, int radialSamples = 8)
+        {
+            if (IsWalkableWithRadius(desiredPos, radius, radialSamples))
+                return desiredPos;
+
+            Vector2 validPos = IsWalkableWithRadius(currentPos, radius, radialSamples)
+                ? currentPos
+                : GetNearestWalkablePosition(currentPos, radius + 2.5f, radius, radialSamples);
+            Vector2 testPos = desiredPos;
+
+            for (int i = 0; i < 10; i++)
+            {
+                Vector2 midPoint = (validPos + testPos) * 0.5f;
+                if (IsWalkableWithRadius(midPoint, radius, radialSamples))
+                    validPos = midPoint;
+                else
+                    testPos = midPoint;
+            }
+
+            return validPos;
+        }
+
+        private Vector2 FindNearestWalkableByGridSearch(Vector2 worldPosition)
+        {
+            if (!isInitialized)
+            {
+                return (arenaBoundsMin + arenaBoundsMax) * 0.5f;
+            }
+
+            int samplesX = Mathf.Max(16, Mathf.CeilToInt((arenaBoundsMax.x - arenaBoundsMin.x) / 1.5f));
+            int samplesY = Mathf.Max(10, Mathf.CeilToInt((arenaBoundsMax.y - arenaBoundsMin.y) / 1.5f));
+            float bestDist = float.MaxValue;
+            Vector2 bestPos = worldPosition;
+
+            for (int ix = 0; ix <= samplesX; ix++)
+            {
+                float u = ix / (float)samplesX;
+                float x = Mathf.Lerp(arenaBoundsMin.x, arenaBoundsMax.x, u);
+                for (int iy = 0; iy <= samplesY; iy++)
+                {
+                    float v = iy / (float)samplesY;
+                    float y = Mathf.Lerp(arenaBoundsMin.y, arenaBoundsMax.y, v);
+                    Vector2 p = new Vector2(x, y);
+                    if (!IsWalkable(p)) continue;
+                    float d = (p - worldPosition).sqrMagnitude;
+                    if (d < bestDist)
+                    {
+                        bestDist = d;
+                        bestPos = p;
+                    }
+                }
+            }
+
+            return bestDist < float.MaxValue ? bestPos : worldPosition;
         }
 
         /// <summary>

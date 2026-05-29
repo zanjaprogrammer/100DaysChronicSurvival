@@ -16,6 +16,7 @@ namespace ChronicSurvival.Battle
         [SerializeField] private float leaderInputDeadZone = 0.12f;
         [SerializeField] private float attackSearchRadius = 14f;
         [SerializeField] private float retargetInterval = 0.4f;
+        [SerializeField] private bool enableKeyboardLeaderInput = true;
 
         private readonly List<ImmuneCell> officers = new List<ImmuneCell>();
         private readonly List<Enemy> cachedTargets = new List<Enemy>();
@@ -131,6 +132,15 @@ namespace ChronicSurvival.Battle
                 return;
             }
 
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                RequestAttackMode();
+            }
+            else if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
+            {
+                SetFollowMode();
+            }
+
             CleanupMembers();
 
             if (mode == SquadCommandMode.Attack)
@@ -145,10 +155,21 @@ namespace ChronicSurvival.Battle
 
         private void UpdateFollowMode()
         {
-            float moveMagnitude = moveInput.magnitude;
+            Vector2 combinedInput = moveInput;
+            if (enableKeyboardLeaderInput)
+            {
+                Vector2 keyboardInput = Vector2.zero;
+                if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) keyboardInput.y += 1f;
+                if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) keyboardInput.y -= 1f;
+                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) keyboardInput.x -= 1f;
+                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) keyboardInput.x += 1f;
+                combinedInput = Vector2.ClampMagnitude(combinedInput + keyboardInput, 1f);
+            }
+
+            float moveMagnitude = combinedInput.magnitude;
             if (moveMagnitude > leaderInputDeadZone)
             {
-                leader.MoveDirectly(moveInput, 1f);
+                leader.MoveDirectly(combinedInput, 1f);
             }
             else
             {
@@ -156,7 +177,7 @@ namespace ChronicSurvival.Battle
             }
 
             float formationRadius = moveMagnitude > leaderInputDeadZone ? movingFormationRadius : idleFormationRadius;
-            Vector2 forward = moveMagnitude > leaderInputDeadZone ? moveInput.normalized : Vector2.up;
+            Vector2 forward = moveMagnitude > leaderInputDeadZone ? combinedInput.normalized : Vector2.up;
             UpdateFormationAroundLeader(formationRadius, forward);
         }
 
@@ -277,7 +298,15 @@ namespace ChronicSurvival.Battle
                 Vector2 destination = (Vector2)leader.transform.position + rotated;
                 if (ArenaWalkableMask.Instance != null)
                 {
-                    destination = ArenaWalkableMask.Instance.GetNearestWalkablePosition(destination, formationRadius + 2f);
+                    float officerRadius = 0.22f;
+                    CircleCollider2D collider = officer.GetComponent<CircleCollider2D>();
+                    if (collider != null)
+                    {
+                        float maxScale = Mathf.Max(officer.transform.lossyScale.x, officer.transform.lossyScale.y);
+                        officerRadius = Mathf.Max(0.05f, collider.radius * maxScale);
+                    }
+
+                    destination = ArenaWalkableMask.Instance.GetNearestWalkablePosition(destination, formationRadius + 6f, officerRadius, 10);
                 }
 
                 officer.MoveToPoint(destination, 0.35f, 0.94f);

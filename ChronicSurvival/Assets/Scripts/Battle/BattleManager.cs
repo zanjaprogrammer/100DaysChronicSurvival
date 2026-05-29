@@ -386,7 +386,28 @@ namespace ChronicSurvival.Battle
         {
             if (ArenaWalkableMask.Instance != null)
             {
-                return ArenaWalkableMask.Instance.GetNearestWalkablePosition(position, 10f);
+                const float spawnRadius = 0.24f;
+                ArenaWalkableMask mask = ArenaWalkableMask.Instance;
+
+                Vector2 candidate = mask.GetNearestWalkablePosition(position, 16f, spawnRadius, 12);
+                if (mask.IsWalkableWithRadius(candidate, spawnRadius, 12))
+                {
+                    return candidate;
+                }
+
+                // Hard fallback: explicitly sample red/walkable area only.
+                for (int i = 0; i < 48; i++)
+                {
+                    Vector2 randomWalkable = mask.GetRandomWalkablePosition();
+                    Vector2 strict = mask.GetNearestWalkablePosition(randomWalkable, 10f, spawnRadius, 12);
+                    if (mask.IsWalkableWithRadius(strict, spawnRadius, 12))
+                    {
+                        return strict;
+                    }
+                }
+
+                // Final fallback: safest valid point we can derive.
+                return mask.GetNearestWalkablePosition(position, 28f);
             }
 
             return position;

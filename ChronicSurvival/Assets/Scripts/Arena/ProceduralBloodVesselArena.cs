@@ -49,29 +49,46 @@ namespace ChronicSurvival.Arena
         [SerializeField] private Vector2 arenaSize = new Vector2(96f, 48f);
         [SerializeField] private int textureWidth = 480;
         [SerializeField] private int textureHeight = 240;
-        [SerializeField] private float defaultVesselHalfWidth = 4.6f;
-        [SerializeField] private float edgeFeather = 1.15f;
+        [SerializeField] private float defaultVesselHalfWidth = 50f;
+        [SerializeField] private float edgeFeather = 25f;
         [SerializeField] private int sortingOrder = -120;
+        [SerializeField] private bool drawLegacyVesselLines = false;
+        [SerializeField] private bool randomizeGenerationEachRun = true;
+        
+        [Header("Temporary Simple Arena")]
+        [SerializeField] private bool useSimpleCircularArena = true;
+        [SerializeField] private float simpleArenaRadius = 40f;
+        [SerializeField] private float simpleArenaEdgeFeather = 6f;
 
         [Header("Streaming")]
         [SerializeField] private int initialMainSegments = 5;
         [SerializeField] private int initialExtraBranches = 2;
-        [SerializeField] private float generationTriggerDistance = 24f;
-        [SerializeField] private float minimumMainAheadDistance = 42f;
-        [SerializeField] private int maxMainRouteSegments = 72;
+        [SerializeField] private float generationTriggerDistance = 48f;
+        [SerializeField] private float minimumMainAheadDistance = 140f;
+        [SerializeField] private int maxMainRouteSegments = 140;
         [SerializeField] private int maxBranchSegments = 28;
-        [SerializeField] private float segmentSpacingPadding = 4f;
+        [SerializeField] private float segmentSpacingPadding = 0.1f;
         [SerializeField] private float cameraBoundsPadding = 18f;
 
         [Header("Branching")]
         [SerializeField] private float branchChance = 0.4f;
         [SerializeField] private float arenaChance = 0.24f;
+        
+        [Header("Macro Arena Patches")]
+        [SerializeField] private bool enableMacroArenaPatches = true;
+        [SerializeField, Range(0f, 1f)] private float macroPatchSpawnChance = 1f;
+        [SerializeField] private float macroPatchMinRadius = 50f;
+        [SerializeField] private float macroPatchMaxRadius = 42f;
+        [SerializeField] private float macroPatchEdgeFeather = 10f;
+        [SerializeField, Range(0.3f, 1.5f)] private float macroPatchStrength = 1.5f;
+        [SerializeField] private int macroPatchSeed = 1337;
 
         private readonly List<PlacedSegment> placedSegments = new List<PlacedSegment>();
         private readonly List<SegmentSocket> frontierSockets = new List<SegmentSocket>();
         private readonly List<SegmentDefinition> straightDefinitions = new List<SegmentDefinition>();
         private readonly List<SegmentDefinition> branchDefinitions = new List<SegmentDefinition>();
         private readonly List<SegmentDefinition> arenaDefinitions = new List<SegmentDefinition>();
+        private readonly List<MacroArenaPatch> macroArenaPatches = new List<MacroArenaPatch>();
 
         private SpriteRenderer spriteRenderer;
         private Material runtimeMaterial;
@@ -81,6 +98,16 @@ namespace ChronicSurvival.Arena
         private Camera runtimeCamera;
         private CameraController cameraController;
         private BloodFlowSimulator flowSimulator;
+        private int runtimeSeed;
+        private Vector2 textureNoiseOffset;
+        private float textureRipplePhase;
+        
+        private struct MacroArenaPatch
+        {
+            public Vector2 center;
+            public float radius;
+            public float strength;
+        }
 
         public Bounds ArenaBounds => arenaBounds;
         public Camera RuntimeCamera => runtimeCamera;
@@ -102,18 +129,100 @@ namespace ChronicSurvival.Arena
 
         private void Update()
         {
+            if (useSimpleCircularArena) return;
             if (runtimeCamera == null) return;
             GenerateNearCameraFrontiers();
         }
 
         private void BuildArena()
         {
+            InitializeRuntimeSeed();
+            if (useSimpleCircularArena)
+            {
+                BuildSimpleCircularArena();
+                return;
+            }
             SetupCamera();
             GenerateInitialLayout();
             RebuildArenaPresentation();
             BuildBloodFlow();
             EnsurePathfinder();
             RefreshCameraBounds();
+        }
+
+        private void BuildSimpleCircularArena()
+        {
+            SetupCamera();
+            placedSegments.Clear();
+            frontierSockets.Clear();
+
+            float diameter = simpleArenaRadius * 2f;
+            arenaBounds = new Bounds(Vector3.zero, new Vector3(diameter, diameter, 0f));
+
+            CreateSimpleCircularTextures();
+            SetupRenderer();
+
+            Transform old = transform.Find("VesselLines");
+            if (old != null) Destroy(old.gameObject);
+
+            SetupMask();
+            BuildBloodFlow();
+            EnsurePathfinder();
+            RefreshCameraBounds();
+        }
+
+        private void CreateSimpleCircularTextures()
+        {
+            arenaTexture = new Texture2D(textureWidth, textureHeight, TextureFormat.RGBA32, false);
+            arenaTexture.wrapMode = TextureWrapMode.Clamp;
+            arenaTexture.filterMode = FilterMode.Point;
+
+            maskTexture = new Texture2D(textureWidth, textureHeight, TextureFormat.RGBA32, false);
+            maskTexture.wrapMode = TextureWrapMode.Clamp;
+            maskTexture.filterMode = FilterMode.Point;
+
+            Color[] colors = new Color[textureWidth * textureHeight];
+            Color[] mask = new Color[textureWidth * textureHeight];
+
+            for (int y = 0; y < textureHeight; y++)
+            {
+                for (int x = 0; x < textureWidth; x++)
+                {
+                    Vector2 world = PixelToWorld(x, y);
+                    float distance = world.magnitude;
+                    float field = 1f - Mathf.SmoothStep(simpleArenaRadius - simpleArenaEdgeFeather, simpleArenaRadius, distance);
+                    float noise = Mathf.PerlinNoise(world.x * 0.12f + textureNoiseOffset.x, world.y * 0.14f + textureNoiseOffset.y);
+
+                    Color tissue = Color.Lerp(new Color(0.05f, 0.01f, 0.02f, 1f), new Color(0.14f, 0.022f, 0.045f, 1f), noise);
+                    Color blood = Color.Lerp(new Color(0.30f, 0.01f, 0.025f, 1f), new Color(0.52f, 0.03f, 0.05f, 1f), Mathf.Clamp01(field * 0.9f + noise * 0.1f));
+                    Color final = Color.Lerp(tissue, blood, Mathf.Clamp01(field));
+                    final = QuantizeColor(final, 5);
+
+                    int idx = y * textureWidth + x;
+                    colors[idx] = final;
+                    mask[idx] = field > 0.2f ? Color.white : Color.black;
+                }
+            }
+
+            arenaTexture.SetPixels(colors);
+            arenaTexture.Apply();
+            maskTexture.SetPixels(mask);
+            maskTexture.Apply();
+        }
+        
+        private void InitializeRuntimeSeed()
+        {
+            runtimeSeed = randomizeGenerationEachRun ? System.Environment.TickCount : macroPatchSeed;
+            unchecked
+            {
+                float seedA = runtimeSeed * 0.000173f;
+                float seedB = runtimeSeed * 0.000317f;
+                textureNoiseOffset = new Vector2(
+                    Mathf.Sin(seedA) * 97.31f,
+                    Mathf.Cos(seedB) * 91.17f
+                );
+                textureRipplePhase = Mathf.Sin(runtimeSeed * 0.00021f) * Mathf.PI;
+            }
         }
 
         private void InitializeDefinitions()
@@ -289,7 +398,12 @@ namespace ChronicSurvival.Arena
 
         private void GenerateNearCameraFrontiers()
         {
-            if (frontierSockets.Count == 0 || ReachedSegmentCapacity()) return;
+            if (ReachedSegmentCapacity()) return;
+            if (frontierSockets.Count == 0)
+            {
+                TryRebuildFrontierFromTail();
+                if (frontierSockets.Count == 0) return;
+            }
 
             Vector2 cameraPos = runtimeCamera.transform.position;
             bool generated = false;
@@ -325,6 +439,12 @@ namespace ChronicSurvival.Arena
             bool changed = false;
             while (farthestAhead < minimumMainAheadDistance && !ReachedMainRouteCapacity())
             {
+                if (frontierSockets.Count == 0)
+                {
+                    TryRebuildFrontierFromTail();
+                    if (frontierSockets.Count == 0) break;
+                }
+
                 if (!TryExpandMainRoute()) break;
                 changed = true;
                 farthestAhead = float.MinValue;
@@ -570,9 +690,18 @@ namespace ChronicSurvival.Arena
         private void RebuildArenaPresentation()
         {
             RecalculateArenaBounds();
+            GenerateMacroArenaPatches();
             CreateTextures();
             SetupRenderer();
-            BuildVesselLines();
+            if (drawLegacyVesselLines)
+            {
+                BuildVesselLines();
+            }
+            else
+            {
+                Transform old = transform.Find("VesselLines");
+                if (old != null) Destroy(old.gameObject);
+            }
             SetupMask();
         }
 
@@ -643,20 +772,22 @@ namespace ChronicSurvival.Arena
                     float vesselHalfWidth = Mathf.Max(defaultVesselHalfWidth * 0.7f, widthAtPoint);
                     float vessel = 1f - Mathf.SmoothStep(vesselHalfWidth - edgeFeather, vesselHalfWidth, dist);
                     float centerGlow = 1f - Mathf.SmoothStep(0f, vesselHalfWidth * 0.68f, dist);
-                    float noise = Mathf.PerlinNoise(world.x * 0.27f + 19.3f, world.y * 0.38f - 4.7f);
-                    float ripple = Mathf.Sin(world.x * 1.05f + world.y * 0.52f) * 0.5f + 0.5f;
+                    float macroArenaInfluence = GetMacroArenaInfluence(world);
+                    float broadField = Mathf.Clamp01(Mathf.Max(macroArenaInfluence, vessel * 0.72f));
+                    centerGlow = Mathf.Clamp01(centerGlow * 0.15f + broadField * 0.85f);
+                    float noise = Mathf.PerlinNoise(world.x * 0.24f + 19.3f + textureNoiseOffset.x, world.y * 0.35f - 4.7f + textureNoiseOffset.y);
+                    float ripple = Mathf.Sin(world.x * 0.88f + world.y * 0.47f + textureRipplePhase) * 0.5f + 0.5f;
 
                     Color tissue = Color.Lerp(new Color(0.07f, 0.012f, 0.025f, 1f), new Color(0.19f, 0.03f, 0.055f, 1f), Quantize01(noise, 4));
-                    Color blood = Color.Lerp(new Color(0.34f, 0.01f, 0.025f, 1f), new Color(0.62f, 0.035f, 0.045f, 1f), Quantize01(centerGlow * 0.72f + ripple * 0.14f, 4));
-                    Color edge = new Color(0.18f, 0.004f, 0.018f, 1f);
-                    float vesselBlend = Quantize01(Mathf.Clamp01(vessel * 1.2f), 3);
-                    Color final = Color.Lerp(tissue, Color.Lerp(edge, blood, vesselBlend), Quantize01(vessel, 3));
-                    final += new Color(0.08f, 0.006f, 0.006f, 0f) * Quantize01(centerGlow, 3);
+                    Color blood = Color.Lerp(new Color(0.31f, 0.01f, 0.023f, 1f), new Color(0.48f, 0.03f, 0.04f, 1f), Quantize01(centerGlow * 0.56f + ripple * 0.2f, 4));
+                    Color edge = new Color(0.17f, 0.006f, 0.019f, 1f);
+                    float vesselBlend = Quantize01(Mathf.Clamp01(broadField * 1.05f), 3);
+                    Color final = Color.Lerp(tissue, Color.Lerp(edge, blood, vesselBlend), Quantize01(broadField, 3));
                     final = QuantizeColor(final, 5);
 
                     int idx = y * textureWidth + x;
                     colors[idx] = final;
-                    mask[idx] = vessel > 0.38f ? Color.white : Color.black;
+                    mask[idx] = broadField > 0.08f ? Color.white : Color.black;
                 }
             }
 
@@ -664,6 +795,187 @@ namespace ChronicSurvival.Arena
             arenaTexture.Apply();
             maskTexture.SetPixels(mask);
             maskTexture.Apply();
+        }
+        
+        private void GenerateMacroArenaPatches()
+        {
+            macroArenaPatches.Clear();
+            if (!enableMacroArenaPatches) return;
+            if (placedSegments.Count == 0) return;
+
+            System.Random rng = new System.Random(runtimeSeed ^ macroPatchSeed ^ 0x5A17);
+
+            // Add free-form patches over the current arena bounds so the shape doesn't always
+            // follow segment centers. This breaks repetitive motif from route topology.
+            int freePatchCount = Mathf.Clamp(Mathf.RoundToInt(placedSegments.Count * 0.45f), 4, 36);
+            for (int i = 0; i < freePatchCount; i++)
+            {
+                if (rng.NextDouble() > macroPatchSpawnChance) continue;
+
+                Vector2 center = new Vector2(
+                    Mathf.Lerp(arenaBounds.min.x, arenaBounds.max.x, (float)rng.NextDouble()),
+                    Mathf.Lerp(arenaBounds.min.y, arenaBounds.max.y, (float)rng.NextDouble())
+                );
+                float radius = Mathf.Lerp(macroPatchMinRadius, macroPatchMaxRadius, (float)rng.NextDouble());
+                float strength = Mathf.Lerp(0.75f, 1.2f, (float)rng.NextDouble()) * macroPatchStrength;
+
+                if (ArenaWalkableMask.Instance != null)
+                {
+                    center = ArenaWalkableMask.Instance.GetNearestWalkablePosition(center, radius * 1.25f);
+                }
+
+                macroArenaPatches.Add(new MacroArenaPatch
+                {
+                    center = center,
+                    radius = radius,
+                    strength = strength
+                });
+            }
+
+            for (int segmentIndex = 0; segmentIndex < placedSegments.Count; segmentIndex++)
+            {
+                Vector2[] path = placedSegments[segmentIndex].mainPath;
+                if (path == null || path.Length < 2) continue;
+
+                float spawnRoll = Deterministic01(segmentIndex, 11);
+                if (spawnRoll > macroPatchSpawnChance) continue;
+
+                float t = Mathf.Lerp(0.2f, 0.8f, Deterministic01(segmentIndex, 29));
+                Vector2 center = EvaluatePathPoint(path, t);
+                float radius = Mathf.Lerp(macroPatchMinRadius, macroPatchMaxRadius, Deterministic01(segmentIndex, 53));
+                float strength = Mathf.Lerp(0.78f, 1.15f, Deterministic01(segmentIndex, 97)) * macroPatchStrength;
+
+                // Small lateral offset so pockets feel organic and less centered.
+                Vector2 tangent = EvaluatePathTangent(path, t);
+                Vector2 normal = new Vector2(-tangent.y, tangent.x);
+                float lateralOffset = Mathf.Lerp(-radius * 0.38f, radius * 0.38f, Deterministic01(segmentIndex, 131));
+                center += normal * lateralOffset;
+
+                macroArenaPatches.Add(new MacroArenaPatch
+                {
+                    center = center,
+                    radius = radius,
+                    strength = strength
+                });
+            }
+        }
+        
+        private float GetMacroArenaInfluence(Vector2 worldPoint)
+        {
+            if (macroArenaPatches.Count == 0) return 0f;
+
+            float influence = 0f;
+            for (int i = 0; i < macroArenaPatches.Count; i++)
+            {
+                MacroArenaPatch patch = macroArenaPatches[i];
+                float dist = Vector2.Distance(worldPoint, patch.center);
+                float patchValue = 1f - Mathf.SmoothStep(patch.radius - macroPatchEdgeFeather, patch.radius, dist);
+                patchValue *= patch.strength;
+                if (patchValue > influence)
+                {
+                    influence = patchValue;
+                }
+            }
+
+            return Mathf.Clamp01(influence);
+        }
+
+        private void TryRebuildFrontierFromTail()
+        {
+            if (placedSegments.Count == 0 || ReachedMainRouteCapacity()) return;
+
+            int bestIndex = -1;
+            float bestX = float.MinValue;
+            for (int i = 0; i < placedSegments.Count; i++)
+            {
+                float x = placedSegments[i].exitSocket.position.x;
+                if (x > bestX)
+                {
+                    bestX = x;
+                    bestIndex = i;
+                }
+            }
+
+            if (bestIndex < 0) return;
+
+            SegmentSocket candidate = placedSegments[bestIndex].exitSocket;
+            for (int i = 0; i < frontierSockets.Count; i++)
+            {
+                if (Vector2.Distance(frontierSockets[i].position, candidate.position) < 0.2f)
+                {
+                    return;
+                }
+            }
+
+            frontierSockets.Add(candidate);
+        }
+        
+        private float Deterministic01(int index, int salt)
+        {
+            float seed = (runtimeSeed ^ macroPatchSeed) * 0.001f + index * 12.9898f + salt * 78.233f;
+            return Mathf.Abs(Mathf.Sin(seed) * 43758.5453f) % 1f;
+        }
+        
+        private Vector2 EvaluatePathPoint(Vector2[] path, float t)
+        {
+            if (path == null || path.Length == 0) return Vector2.zero;
+            if (path.Length == 1) return path[0];
+
+            float totalLength = 0f;
+            for (int i = 0; i < path.Length - 1; i++)
+            {
+                totalLength += Vector2.Distance(path[i], path[i + 1]);
+            }
+
+            if (totalLength <= 0.0001f) return path[0];
+
+            float targetDistance = Mathf.Clamp01(t) * totalLength;
+            float traversed = 0f;
+            for (int i = 0; i < path.Length - 1; i++)
+            {
+                Vector2 a = path[i];
+                Vector2 b = path[i + 1];
+                float segLength = Vector2.Distance(a, b);
+                if (traversed + segLength >= targetDistance)
+                {
+                    float localT = segLength <= 0.0001f ? 0f : (targetDistance - traversed) / segLength;
+                    return Vector2.Lerp(a, b, localT);
+                }
+                traversed += segLength;
+            }
+
+            return path[path.Length - 1];
+        }
+        
+        private Vector2 EvaluatePathTangent(Vector2[] path, float t)
+        {
+            if (path == null || path.Length < 2) return Vector2.right;
+
+            float totalLength = 0f;
+            for (int i = 0; i < path.Length - 1; i++)
+            {
+                totalLength += Vector2.Distance(path[i], path[i + 1]);
+            }
+
+            if (totalLength <= 0.0001f) return Vector2.right;
+
+            float targetDistance = Mathf.Clamp01(t) * totalLength;
+            float traversed = 0f;
+            for (int i = 0; i < path.Length - 1; i++)
+            {
+                Vector2 a = path[i];
+                Vector2 b = path[i + 1];
+                float segLength = Vector2.Distance(a, b);
+                if (traversed + segLength >= targetDistance)
+                {
+                    Vector2 tangent = (b - a).normalized;
+                    return tangent.sqrMagnitude > 0.0001f ? tangent : Vector2.right;
+                }
+                traversed += segLength;
+            }
+
+            Vector2 last = (path[path.Length - 1] - path[path.Length - 2]).normalized;
+            return last.sqrMagnitude > 0.0001f ? last : Vector2.right;
         }
 
         private void SetupRenderer()
@@ -768,7 +1080,7 @@ namespace ChronicSurvival.Arena
             cameraController = cam.GetComponent<CameraController>();
             if (cameraController == null) cameraController = cam.gameObject.AddComponent<CameraController>();
             cameraController.SetBounds(new Bounds(Vector3.zero, new Vector3(arenaSize.x * 4f, arenaSize.y * 4f, 0f)), 0.5f);
-            cameraController.SetZoomLimits(3.2f, arenaSize.y * 0.55f);
+            cameraController.SetZoomLimits(3.2f, Mathf.Min(5.6f, arenaSize.y * 0.38f));
             cameraController.SetPosition(new Vector3(0f, 0f, -10f));
         }
 

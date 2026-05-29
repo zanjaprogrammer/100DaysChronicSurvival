@@ -1,9 +1,15 @@
 using UnityEngine;
+using ChronicSurvival.Battle;
 
 namespace ChronicSurvival.Core
 {
     public class CameraController : MonoBehaviour
     {
+        [Header("Follow")]
+        [SerializeField] private bool followLeader = true;
+        [SerializeField] private bool autoFindLeader = true;
+        [SerializeField] private Vector3 followOffset = new Vector3(0f, 0f, -10f);
+
         [Header("Movement")]
         [SerializeField] private float moveSpeed = 7f;
         [SerializeField] private float edgeScrollSpeed = 10f;
@@ -32,6 +38,7 @@ namespace ChronicSurvival.Core
         private Vector3 targetPosition;
         private float targetZoom;
         private Vector3 lastDragWorld;
+        private Transform followTarget;
 
         private void Start()
         {
@@ -42,10 +49,35 @@ namespace ChronicSurvival.Core
 
         private void Update()
         {
-            HandleMovement();
-            HandleDragPan();
+            ResolveFollowTarget();
+            if (followLeader && followTarget != null)
+            {
+                targetPosition = followTarget.position + followOffset;
+                ClampTargetPosition();
+            }
+            else
+            {
+                HandleMovement();
+                HandleDragPan();
+            }
             HandleZoom();
             ApplyMovement();
+        }
+
+        private void ResolveFollowTarget()
+        {
+            if (!followLeader || !autoFindLeader || followTarget != null)
+            {
+                return;
+            }
+
+            ImmuneSquadController squad = FindFirstObjectByType<ImmuneSquadController>(FindObjectsInactive.Include);
+            if (squad == null || squad.Leader == null || squad.Leader.IsDead)
+            {
+                return;
+            }
+
+            followTarget = squad.Leader.transform;
         }
 
         private void HandleMovement()
@@ -178,6 +210,12 @@ namespace ChronicSurvival.Core
             minBounds = new Vector2(bounds.min.x + padding, bounds.min.y + padding);
             maxBounds = new Vector2(bounds.max.x - padding, bounds.max.y - padding);
             ClampTargetPosition();
+        }
+
+        public void SetFollowTarget(Transform target, bool enableFollow = true)
+        {
+            followTarget = target;
+            followLeader = enableFollow;
         }
     }
 }

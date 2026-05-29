@@ -6,6 +6,7 @@ namespace ChronicSurvival.Arena
 {
     public class BloodFlowSimulator : MonoBehaviour
     {
+        [SerializeField] private bool enableRedBloodCells = false;
         [SerializeField] private float cellsPerArea = 0.34f;
         [SerializeField] private float spawnInterval = 0.03f;
         [SerializeField] private float minCellSize = 0.62f;
@@ -27,8 +28,13 @@ namespace ChronicSurvival.Arena
             preferredSpawnBounds = spawnBounds;
             vesselHalfWidth = halfWidth;
             targetCamera = cameraRef != null ? cameraRef : (Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>(FindObjectsInactive.Include));
-            targetCount = Mathf.Clamp(Mathf.RoundToInt(bounds.size.x * halfWidth * cellsPerArea * 1.3f), 60, 260);
+            targetCount = enableRedBloodCells ? Mathf.Clamp(Mathf.RoundToInt(bounds.size.x * halfWidth * cellsPerArea * 1.3f), 60, 260) : 0;
             spawnTimer = Random.Range(0f, spawnInterval);
+            if (!enableRedBloodCells)
+            {
+                ClearAllCells();
+                return;
+            }
             SeedInitialCells();
         }
 
@@ -41,11 +47,21 @@ namespace ChronicSurvival.Arena
             {
                 targetCamera = cameraRef;
             }
-            targetCount = Mathf.Clamp(Mathf.RoundToInt(bounds.size.x * halfWidth * cellsPerArea * 1.3f), 60, 260);
+            targetCount = enableRedBloodCells ? Mathf.Clamp(Mathf.RoundToInt(bounds.size.x * halfWidth * cellsPerArea * 1.3f), 60, 260) : 0;
+            if (!enableRedBloodCells)
+            {
+                ClearAllCells();
+            }
         }
 
         private void Update()
         {
+            if (!enableRedBloodCells)
+            {
+                ClearAllCells();
+                return;
+            }
+
             cells.RemoveAll(cell => cell == null);
             spawnTimer += Time.deltaTime;
 
@@ -136,6 +152,18 @@ namespace ChronicSurvival.Arena
             float x = Mathf.Lerp(preferredSpawnBounds.min.x + 1.5f, preferredSpawnBounds.max.x - 1.5f, Mathf.Clamp01(t));
             float y = Random.Range(preferredSpawnBounds.min.y, preferredSpawnBounds.max.y);
             return new Vector2(x, y);
+        }
+
+        private void ClearAllCells()
+        {
+            for (int i = cells.Count - 1; i >= 0; i--)
+            {
+                if (cells[i] != null)
+                {
+                    Destroy(cells[i].gameObject);
+                }
+            }
+            cells.Clear();
         }
     }
 }

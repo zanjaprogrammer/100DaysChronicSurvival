@@ -402,12 +402,31 @@ namespace ChronicSurvival.Units
             }
 
             Vector2 normalized = direction.normalized;
-            Vector2 desiredPos = (Vector2)transform.position + normalized * moveSpeed * Mathf.Max(speedMultiplier, 0f) * Time.deltaTime;
+            Vector2 currentPos = transform.position;
+            Vector2 desiredPos = currentPos + normalized * moveSpeed * Mathf.Max(speedMultiplier, 0f) * Time.deltaTime;
 
-            if (ArenaWalkableMask.Instance != null)
+            if (ArenaWalkableMask.Instance != null && ArenaWalkableMask.Instance.IsInitialized)
             {
-                desiredPos = ArenaWalkableMask.Instance.ConstrainMovement(transform.position, desiredPos);
-                normalized = desiredPos - (Vector2)transform.position;
+                float bodyRadius = 0.22f;
+                if (col != null)
+                {
+                    float maxScale = Mathf.Max(transform.lossyScale.x, transform.lossyScale.y);
+                    bodyRadius = Mathf.Max(0.05f, col.radius * maxScale);
+                }
+
+                if (!ArenaWalkableMask.Instance.IsWalkableWithRadius(currentPos, bodyRadius, 10))
+                {
+                    Vector2 snapped = ArenaWalkableMask.Instance.GetNearestWalkablePosition(currentPos, bodyRadius + 8f, bodyRadius, 10);
+                    if ((snapped - currentPos).sqrMagnitude > 0.0001f)
+                    {
+                        transform.position = new Vector3(snapped.x, snapped.y, transform.position.z);
+                        currentPos = snapped;
+                        desiredPos = currentPos + normalized * moveSpeed * Mathf.Max(speedMultiplier, 0f) * Time.deltaTime;
+                    }
+                }
+
+                desiredPos = ArenaWalkableMask.Instance.ConstrainMovement(currentPos, desiredPos, bodyRadius, 10);
+                normalized = desiredPos - currentPos;
                 if (normalized.sqrMagnitude > 0.0001f)
                 {
                     normalized.Normalize();

@@ -2,6 +2,7 @@ using UnityEngine;
 using ChronicSurvival.Core;
 using ChronicSurvival.Units;
 using ChronicSurvival.Arena;
+using ChronicSurvival.UI;
 
 namespace ChronicSurvival.Battle
 {
@@ -20,6 +21,7 @@ namespace ChronicSurvival.Battle
         private bool objectiveAssigned;
         private bool objectiveCompleted;
         private bool isRefreshingHud;
+        private int initialTargetCount;
 
         public bool ObjectiveAssigned => objectiveAssigned;
         public bool ObjectiveCompleted => objectiveCompleted;
@@ -105,12 +107,11 @@ namespace ChronicSurvival.Battle
         {
             for (int i = 0; i < count; i++)
             {
-                float angle = (Mathf.PI * 2f / Mathf.Max(1, count)) * i;
-                float radius = 1.5f + (i / 4) * spawnSpacing;
-                Vector2 position = anchor + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+                Vector2 position = anchor + Random.insideUnitCircle * (spawnSpacing * 3f);
                 if (ArenaWalkableMask.Instance != null)
                 {
-                    position = ArenaWalkableMask.Instance.GetNearestWalkablePosition(position, 6f);
+                    position = ArenaWalkableMask.Instance.GetRandomWalkablePosition();
+                    position = ArenaWalkableMask.Instance.GetNearestWalkablePosition(position, 10f);
                 }
 
                 Enemy enemy = BattleManager.Instance.SpawnEnemy(EnemyType.Basic, DiseaseType.Cancer, position);
@@ -123,6 +124,11 @@ namespace ChronicSurvival.Battle
 
         private Vector2 ResolveSpawnAnchor()
         {
+            if (ArenaWalkableMask.Instance != null)
+            {
+                return ArenaWalkableMask.Instance.GetRandomWalkablePosition();
+            }
+
             ImmuneSquadController squad = FindFirstObjectByType<ImmuneSquadController>(FindObjectsInactive.Include);
             Vector2 basePos = squad != null && squad.Leader != null
                 ? (Vector2)squad.Leader.transform.position
